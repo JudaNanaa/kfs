@@ -9,6 +9,9 @@ $(NAME):
 run: all
 	qemu-system-i386 -kernel $(ELF) -accel tcg -d int,cpu_reset -no-reboot
 
+test:
+	zig build test --summary all
+
 clean:
 	rm -rf .zig-cache
 
@@ -17,4 +20,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all run clean fclean re $(NAME)
+.PHONY: all run test clean fclean re $(NAME)

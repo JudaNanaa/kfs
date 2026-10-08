@@ -25,7 +25,7 @@ const Access = packed struct(u8) {
     dc: bool = false,
 
     /// Executable bit. If clear (0) the descriptor defines a data segment. If set (1) it defines a code segment which can be executed from.
-    executable: bool,
+    executable: bool = false,
 
     /// Descriptor type bit. If clear (0) the descriptor defines a system segment (eg. a Task State Segment). If set (1) it defines a code or data segment.
     s: bool = true,
@@ -90,11 +90,11 @@ const GDT_ADDR = 0x800;
 var gdt: [7]Entry = .{
     Entry.nil, // 0x00
     Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = true, .dpl = .kernel_mode }, .{}), // 0x08 kernel code
-    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = false, .dpl = .kernel_mode }, .{}), // 0x10 kernel data
-    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = false, .dpl = .kernel_mode }, .{}), // 0x18 kernel stack
+    Entry.init(0, 0xFFFFF, .{ .rw = true, .dpl = .kernel_mode }, .{}), // 0x10 kernel data
+    Entry.init(0, 0xFFFFF, .{ .rw = true, .dpl = .kernel_mode }, .{}), // 0x18 kernel stack
     Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = true, .dpl = .user_mode }, .{}), // 0x20 user code
-    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = false, .dpl = .user_mode }, .{}), // 0x28 user data
-    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = false, .dpl = .user_mode }, .{}), // 0x30 user stack
+    Entry.init(0, 0xFFFFF, .{ .rw = true, .dpl = .user_mode }, .{}), // 0x28 user data
+    Entry.init(0, 0xFFFFF, .{ .rw = true, .dpl = .user_mode }, .{}), // 0x30 user stack
 };
 
 extern fn gdt_flush(gdtr: *const Gdtr) callconv(.c) void;
@@ -108,4 +108,55 @@ pub fn init() void {
         .base = GDT_ADDR,
     };
     gdt_flush(&gdtr);
+}
+
+fn expectRaw(expected: u64, e: Entry) !void {
+    try testing.expectEqual(expected, @as(u64, @bitCast(e)));
+}
+
+test "Access : octets d'accès classiques" {
+    const code_k: Access = .{ .rw = true, .executable = true, .dpl = .kernel_mode };
+    const data_k: Access = .{ .rw = true, .dpl = .kernel_mode };
+    const code_u: Access = .{ .rw = true, .executable = true, .dpl = .user_mode };
+    const data_u: Access = .{ .rw = true, .dpl = .user_mode };
+
+    try testing.expectEqual(@as(u8, 0x9B), @as(u8, @bitCast(code_k)));
+    try testing.expectEqual(@as(u8, 0x93), @as(u8, @bitCast(data_k)));
+    try testing.expectEqual(@as(u8, 0xFB), @as(u8, @bitCast(code_u)));
+    try testing.expectEqual(@as(u8, 0xF3), @as(u8, @bitCast(data_u)));
+}
+
+test "Flags : 32 bits + granularité 4 Ko" {
+    try testing.expectEqual(@as(u4, 0xC), @as(u4, @bitCast(Flags{})));
+}
+
+test "Entry : segments flat" {
+    const code_k: Access = .{ .rw = true, .executable = true, .dpl = .kernel_mode };
+    const data_k: Access = .{ .rw = true, .dpl = .kernel_mode };
+    const code_u: Access = .{ .rw = true, .executable = true, .dpl = .user_mode };
+    const data_u: Access = .{ .rw = true, .dpl = .user_mode };
+
+    try expectRaw(0x00CF9B000000FFFF, Entry.init(0, 0xFFFFF, code_k, .{}));
+    try expectRaw(0x00CF93000000FFFF, Entry.init(0, 0xFFFFF, data_k, .{}));
+    try expectRaw(0x00CFFB000000FFFF, Entry.init(0, 0xFFFFF, code_u, .{}));
+    try expectRaw(0x00CFF3000000FFFF, Entry.init(0, 0xFFFFF, data_u, .{}));
+}
+
+test "Entry : découpage de la base" {
+    // base 0x12345678 : 0x345678 dans base_low, 0x12 dans base_high
+    const code_k: Access = .{ .rw = true, .executable = true, .dpl = .kernel_mode };
+    try expectRaw(0x12CF9B345678FFFF, Entry.init(0x12345678, 0xFFFFF, code_k, .{}));
+}
+
+test "Entry : entrée nulle et tailles" {
+    try expectRaw(0, Entry.nil);
+    try testing.expectEqual(@as(usize, 64), @bitSizeOf(Entry));
+    try testing.expectEqual(@as(usize, 48), @bitSizeOf(Gdtr));
+}
+
+test "GDT du kernel : 7 entrées, la première est nulle" {
+    try testing.expectEqual(@as(usize, 7), gdt.len);
+    try expectRaw(0, gdt[0]);
+    try expectRaw(0x00CF9B000000FFFF, gdt[1]); // kernel code
+    try expectRaw(0x00CF93000000FFFF, gdt[2]); // kernel data
 }

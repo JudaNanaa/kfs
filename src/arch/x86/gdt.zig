@@ -1,12 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
-
-const DPL = enum(u2) {
-    kernel_mode = 0,
-    ring1 = 1,
-    ring2 = 2,
-    user_mode = 3,
-};
+const privilege = @import("privilege.zig");
 
 const Access = packed struct(u8) {
     /// Accessed bit. The CPU will set it when the segment is accessed unless set to 1 in advance.
@@ -31,7 +25,7 @@ const Access = packed struct(u8) {
     s: bool = true,
 
     /// Descriptor privilege level field. Contains the CPU Privilege level of the segment. 0 = highest privilege (kernel), 3 = lowest privilege (user applications).
-    dpl: DPL,
+    dpl: privilege.DPL,
 
     /// Present bit. Allows an entry to refer to a valid segment. Must be set (1) for any valid segment.
     /// This means that in case the GDT descriptor is stored in read only pages and this bit is set to 0, the CPU trying to set this bit will trigger a page fault.

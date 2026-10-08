@@ -1,10 +1,10 @@
 const std = @import("std");
 const testing = std.testing;
 
-const DPL = packed struct(u2) {
+const DPL = enum(u2) {
     kernel_mode = 0,
-    _reserve = 1,
-    _reserved = 2,
+    ring1 = 1,
+    ring2 = 2,
     user_mode = 3,
 };
 
@@ -31,7 +31,7 @@ const Access = packed struct(u8) {
     s: bool = true,
 
     /// Descriptor privilege level field. Contains the CPU Privilege level of the segment. 0 = highest privilege (kernel), 3 = lowest privilege (user applications).
-    dpl: u2,
+    dpl: DPL,
 
     /// Present bit. Allows an entry to refer to a valid segment. Must be set (1) for any valid segment.
     /// This means that in case the GDT descriptor is stored in read only pages and this bit is set to 0, the CPU trying to set this bit will trigger a page fault.
@@ -85,55 +85,27 @@ const Gdtr = packed struct(u48) {
     base: u32,
 };
 
+const GDT_ADDR = 0x800;
+
 var gdt: [7]Entry = .{
     Entry.nil, // 0x00
-    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = true, .dpl = 0 }, .{}), // 0x08 kernel code
-    Entry.init(0, 0xFFFFF, .{ .rw = true }, .{}), // 0x10 kernel data
-    Entry.init(0, 0xFFFFF, .{ .rw = true }, .{}), // 0x18 kernel stack
-    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = true, .dpl = 3 }, .{}), // 0x20 user code
-    Entry.init(0, 0xFFFFF, .{ .rw = true, .dpl = 3 }, .{}), // 0x28 user data
-    Entry.init(0, 0xFFFFF, .{ .rw = true, .dpl = 3 }, .{}), // 0x30 user stack
+    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = true, .dpl = .kernel_mode }, .{}), // 0x08 kernel code
+    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = false, .dpl = .kernel_mode }, .{}), // 0x10 kernel data
+    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = false, .dpl = .kernel_mode }, .{}), // 0x18 kernel stack
+    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = true, .dpl = .user_mode }, .{}), // 0x20 user code
+    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = false, .dpl = .user_mode }, .{}), // 0x28 user data
+    Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = false, .dpl = .user_mode }, .{}), // 0x30 user stack
 };
 
 extern fn gdt_flush(gdtr: *const Gdtr) callconv(.c) void;
 
 pub fn init() void {
+    const dest: [*]volatile Entry = @ptrFromInt(GDT_ADDR);
+    @memmove(dest, gdt[0..]);
+
     const gdtr = Gdtr{
         .limit = @sizeOf(@TypeOf(gdt)) - 1,
-        .base = @intFromPtr(&gdt),
+        .base = GDT_ADDR,
     };
     gdt_flush(&gdtr);
 }
-
-// fn raw(e: Entry) u64 {
-//     return @bitCast(e);
-// }
-//
-// test "Access : octets d'accès classiques" {
-//     try testing.expectEqual(@as(u8, 0x9B), @as(u8, @bitCast(Access{ .rw = true, .executable = true })));
-//     try testing.expectEqual(@as(u8, 0x93), @as(u8, @bitCast(Access{ .rw = true })));
-//     try testing.expectEqual(@as(u8, 0xFB), @as(u8, @bitCast(Access{ .rw = true, .executable = true, .dpl = 3 })));
-//     try testing.expectEqual(@as(u8, 0xF3), @as(u8, @bitCast(Access{ .rw = true, .dpl = 3 })));
-// }
-//
-// test "Flags : 32 bits + granularité 4 Ko" {
-//     try testing.expectEqual(@as(u4, 0xC), @as(u4, @bitCast(Flags{})));
-// }
-//
-// test "Entry : segments flat" {
-//     try testing.expectEqual(0x00CF9B000000FFFF, raw(Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = true }, .{})));
-//     try testing.expectEqual(0x00CF93000000FFFF, raw(Entry.init(0, 0xFFFFF, .{ .rw = true }, .{})));
-//     try testing.expectEqual(0x00CFFB000000FFFF, raw(Entry.init(0, 0xFFFFF, .{ .rw = true, .executable = true, .dpl = 3 }, .{})));
-//     try testing.expectEqual(0x00CFF3000000FFFF, raw(Entry.init(0, 0xFFFFF, .{ .rw = true, .dpl = 3 }, .{})));
-// }
-//
-// test "Entry : découpage de la base" {
-//     // base 0x12345678 : 0x345678 dans base_low, 0x12 dans base_high
-//     try testing.expectEqual(0x12CF9B345678FFFF, raw(Entry.init(0x12345678, 0xFFFFF, .{ .rw = true, .executable = true }, .{})));
-// }
-//
-// test "Entry : entrée nulle et tailles" {
-//     try testing.expectEqual(@as(u64, 0), raw(null_entry));
-//     try testing.expectEqual(@as(usize, 64), @bitSizeOf(Entry));
-//     try testing.expectEqual(@as(usize, 48), @bitSizeOf(Gdtr));
-// }

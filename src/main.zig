@@ -1,6 +1,5 @@
 const std = @import("std");
-const Io = std.Io;
-const Terminal = @import("termianl.zig").Terminal;
+const Terminal = @import("terminal.zig").Terminal;
 const gdt = @import("arch/x86/gdt.zig");
 
 export fn kernel_main() callconv(.c) void {

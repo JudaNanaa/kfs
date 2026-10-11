@@ -65,7 +65,7 @@ _start:
 	stack (as it grows downwards on x86 systems). This is necessarily done
 	in assembly as languages such as C cannot function without a stack.
 	*/
-	lea eax, [stack_top]
+	lea esp, [stack_top]
 
 	/*
 	This is a good place to initialize crucial processor state before the

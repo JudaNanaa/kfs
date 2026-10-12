@@ -19,8 +19,7 @@ pub fn active() *Terminal {
 
 /// switch to the terminal ```i```
 pub fn switchTo(i: usize) void {
-    if (i >= count)
-        return;
+    if (i >= count or i == current) return;
     current = i;
     terms[current].flush();
 }
@@ -92,7 +91,6 @@ pub const Terminal = struct {
         if (self.top + vga.height < history) {
             self.top += 1;
         } else {
-            // historique plein : on décale tout d'une ligne
             @memmove(self.cells[0 .. vga.width * (history - 1)], self.cells[vga.width..]);
         }
         const blank = vga.Entry.init(' ', self.fg, self.bg);

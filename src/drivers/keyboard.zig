@@ -43,6 +43,10 @@ fn translate(scancode: u8) u8 {
     return if (upper) keymap_shift[scancode] else base;
 }
 
+const SC_F1 = 0x3B;
+const SC_F10 = 0x44;
+const SC_LALT = 0x38;
+
 pub fn handler() void {
     const data = io.inb(KBD_DATA);
 
@@ -63,6 +67,9 @@ pub fn handler() void {
         SC_RSHIFT => rshift = !is_break,
         SC_CAPS => if (!is_break) {
             caps_lock = !caps_lock;
+        },
+        SC_F1...SC_F10 => if (!is_break) {
+            input.push(.{ .fkey = scancode - SC_F1 }); // 0 pour F1, 1 pour F2...
         },
         else => if (!is_break) {
             const c = translate(scancode);

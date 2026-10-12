@@ -2,7 +2,7 @@ const io = @import("../arch/x86/io.zig");
 const vga = @import("vga.zig");
 
 const terminal = @import("../terminal.zig");
-
+const input = @import("../input.zig");
 const KBD_DATA: u16 = 0x60;
 
 const SC_LSHIFT = 0x2A;
@@ -67,9 +67,8 @@ pub fn handler() void {
         else => if (!is_break) {
             const c = translate(scancode);
             if (c != 0) {
-                const t = terminal.active();
-                t.putChar(c);
-                t.flush();
+                const key = input.charToKey(c);
+                input.push(key);
             }
         },
     }

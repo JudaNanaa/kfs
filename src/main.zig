@@ -3,8 +3,9 @@ const terminal = @import("terminal.zig");
 const gdt = @import("arch/x86/gdt.zig");
 const idt = @import("arch/x86/idt.zig");
 
-const int = @import("interrupts.zig"); // force l'export de interrupt_dispatch
+const int = @import("interrupts.zig");
 
+const shell = @import("shell.zig");
 export fn kernel_main() callconv(.c) void {
     terminal.initAll();
     const t = terminal.active();
@@ -16,6 +17,8 @@ export fn kernel_main() callconv(.c) void {
     int.initIRQ();
     t.printk("IRQ init success\n", .{});
     // asm volatile ("ud2");
+
+    shell.run();
 
     // const t = terminal.active();
     // t.print("pas mal\n", .{});

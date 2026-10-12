@@ -48,7 +48,8 @@ pub const Terminal = struct {
     const visible = vga.width * vga.height;
 
     cells: [vga.width * history]vga.Entry = undefined,
-    top: usize = 0, // première ligne visible
+    /// First visible line
+    top: usize = 0,
     cursor: Cursor = .{},
     fg: vga.Color = .white,
     bg: vga.Color = .black,
@@ -67,6 +68,19 @@ pub const Terminal = struct {
 
     fn view(self: *Terminal) *[visible]vga.Entry {
         return self.cells[self.top * vga.width ..][0..visible];
+    }
+
+    fn writeToVGA(self: *Terminal, entry: vga.Entry) void {
+        vga.write(self.cursor.col, self.cursor.row, entry);
+        self.cursor.sync();
+    }
+
+    pub fn clear(self: *Terminal) void {
+        @memset(&self.cells, vga.Entry.init(' ', self.fg, self.bg));
+        self.top = 0;
+        self.cursor = .{};
+        if (self.isActive())
+            self.flush();
     }
 
     fn newline(self: *Terminal) void {
@@ -93,9 +107,10 @@ pub const Terminal = struct {
             self.cursor.row -= 1;
             self.cursor.col = vga.width - 1;
         } else return;
-        const e = vga.Entry.init(' ', self.fg, self.bg);
-        self.cells[self.cursor.row * vga.width + self.cursor.col] = e;
-        if (self.isActive()) vga.write(self.cursor.col, self.cursor.row, e);
+        const entry = vga.Entry.init(' ', self.fg, self.bg);
+        self.view()[self.cursor.row * vga.width + self.cursor.col] = entry;
+        if (self.isActive())
+            self.writeToVGA(entry);
     }
 
     pub fn putCharColor(self: *Terminal, c: u8, fg: vga.Color, bg: vga.Color) void {
@@ -105,17 +120,22 @@ pub const Terminal = struct {
             8 => self.backspace(),
             '\t' => {
                 const n = 8 - (self.cursor.col % 8);
-                for (0..n) |_| self.putCharColor(' ', fg, bg);
+                for (0..n) |_|
+                    self.putCharColor(' ', fg, bg);
             },
             else => {
                 const i = self.cursor.row * vga.width + self.cursor.col;
-                const e = vga.Entry.init(c, fg, bg);
-                self.view()[i] = e;
-                if (self.isActive()) vga.write(self.cursor.col, self.cursor.row, e);
+                const entry = vga.Entry.init(c, fg, bg);
+                self.view()[i] = entry;
+                if (self.isActive())
+                    self.writeToVGA(entry);
+
                 self.cursor.col += 1;
-                if (self.cursor.col == vga.width) self.newline();
+                if (self.cursor.col == vga.width)
+                    self.newline();
             },
         }
+        self.cursor.sync();
     }
 
     pub fn putChar(self: *Terminal, c: u8) void {

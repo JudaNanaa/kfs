@@ -2,7 +2,8 @@ pub const Key = union(enum) {
     char: u8,
     backspace,
     enter,
-    fkey: u8, // F1..F12, ou Alt+n
+    /// F1..F12, ou Alt+n
+    fkey: u8,
 };
 
 var buf: [128]Key = undefined;
@@ -11,7 +12,7 @@ var tail: usize = 0;
 
 pub fn push(k: Key) void {
     const next = (head + 1) % buf.len;
-    if (next == tail) return; // plein : on jette
+    if (next == tail) return;
     buf[head] = k;
     head = next;
 }

@@ -16,23 +16,10 @@ export fn kernel_main() callconv(.c) void {
     t.printk("IDT init success\n", .{});
     int.initIRQ();
     t.printk("IRQ init success\n", .{});
-    // asm volatile ("ud2");
 
     shell.run();
 
-    // const t = terminal.active();
-    // t.print("pas mal\n", .{});
-    // t.flush();
     while (true) {
         asm volatile ("hlt");
     }
-    // var terms: [4]Terminal = @splat(.{});
-    //
-    // terms[0].init();
-    // terms[0].write("42\n");
-    //
-    // for (0..100) |i| {
-    //     terms[0].print("kfs version {d}\n", .{i});
-    //     terms[0].flush();
-    // }
 }

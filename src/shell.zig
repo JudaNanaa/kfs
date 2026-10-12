@@ -16,9 +16,14 @@ const Command = struct {
 };
 
 const commands = [_]Command{
-    .{ .name = "clear", .help = "efface l'écran", .run = cmdClear },
-    .{ .name = "help", .help = "liste les commandes", .run = cmdHelp },
+    .{ .name = "clear", .help = "clear the screen", .run = cmdClear },
+    .{ .name = "echo", .help = "display a line of text", .run = echo },
+    .{ .name = "help", .help = "show all commands", .run = cmdHelp },
 };
+
+fn echo(args: []const u8) void {
+    terminal.active().print("{s}\n", .{args});
+}
 
 fn cmdClear(_: []const u8) void {
     terminal.active().clear();

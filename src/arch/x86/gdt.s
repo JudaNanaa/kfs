@@ -2,8 +2,8 @@
 
 .global gdt_flush
 gdt_flush:
-    mov eax, [esp + 4]      # argument : pointeur vers le Gdtr
-    lgdt [eax]
+    mov eax, [esp + 4]      # take the argument from the stack: Gdtr address
+    lgdt [eax]				# load the gdt 
 
     mov ax, 0x10            # kernel data
     mov ds, ax

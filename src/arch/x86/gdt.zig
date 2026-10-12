@@ -34,7 +34,7 @@ const Access = packed struct(u8) {
 };
 
 const Flags = packed struct(u4) {
-    /// Reserved
+    /// Reserved, need to be 0
     avl: bool = false,
 
     /// Long-mode code flag. If set (1), the descriptor defines a 64-bit code segment.

@@ -1,7 +1,6 @@
 const io = @import("../arch/x86/io.zig");
 const vga = @import("vga.zig");
 
-const debug = @import("../debug.zig");
 const terminal = @import("../terminal.zig");
 
 const KBD_DATA: u16 = 0x60;
@@ -44,47 +43,34 @@ fn translate(scancode: u8) u8 {
     return if (upper) keymap_shift[scancode] else base;
 }
 
-// var ok: u32 = 0;
-
 pub fn handler() void {
-    _ = io.inb(KBD_DATA);
-    // debug.putStr(0, ok, "je suis dans keyboard.handler\n");
-    // ok += 1;
-    const t = terminal.active();
-    t.putChar('A');
-    return;
+    const data = io.inb(KBD_DATA);
 
-    // const data = io.inb(KBD_DATA);
-    //
-    // if (data == 0xE0) {
-    //     extended = true;
-    //     return;
-    // }
-    // if (extended) {
-    //     extended = false;
-    //     return;
-    // }
-    //
-    // const is_break = data & 0x80 != 0;
-    // const scancode = data & 0x7F;
-    //
-    // switch (scancode) {
-    //     SC_LSHIFT => lshift = !is_break,
-    //     SC_RSHIFT => rshift = !is_break,
-    //     SC_CAPS => if (!is_break) {
-    //         caps_lock = !caps_lock;
-    //     },
-    //     else => if (!is_break) {
-    //         const c = translate(scancode);
-    //         if (c != 0) {
-    //             const t = terminal.active();
-    //             t.putChar(c);
-    //             t.flush();
-    //         }
-    //     },
-    // }
-}
+    if (data == 0xE0) {
+        extended = true;
+        return;
+    }
+    if (extended) {
+        extended = false;
+        return;
+    }
 
-fn putStr(x: usize, y: usize, s: []const u8) void {
-    for (s, 0..) |c, i| vga.write(x + i, y, vga.Entry.init(c, .white, .red));
+    const is_break = data & 0x80 != 0;
+    const scancode = data & 0x7F;
+
+    switch (scancode) {
+        SC_LSHIFT => lshift = !is_break,
+        SC_RSHIFT => rshift = !is_break,
+        SC_CAPS => if (!is_break) {
+            caps_lock = !caps_lock;
+        },
+        else => if (!is_break) {
+            const c = translate(scancode);
+            if (c != 0) {
+                const t = terminal.active();
+                t.putChar(c);
+                t.flush();
+            }
+        },
+    }
 }

@@ -25,84 +25,101 @@ pub fn switchTo(i: usize) void {
     terms[current].flush();
 }
 
-pub const Terminal = struct {
-    cells: [vga.width * vga.height]vga.Entry = undefined,
+const Cursor = struct {
     row: usize = 0,
     col: usize = 0,
+
+    fn init() Cursor {
+        return .{ .row = 0, .col = 0 };
+    }
+
+    fn reset(self: *Cursor) void {
+        self.col = 0;
+        self.row = 0;
+    }
+
+    fn sync(self: *Cursor) void {
+        vga.setCursor(self.col, self.row);
+    }
+};
+
+pub const Terminal = struct {
+    const history = 1000;
+    const visible = vga.width * vga.height;
+
+    cells: [vga.width * history]vga.Entry = undefined,
+    top: usize = 0, // première ligne visible
+    cursor: Cursor = .{},
     fg: vga.Color = .white,
     bg: vga.Color = .black,
 
-    fn init(self: *Terminal) void {
-        self.row = 0;
-        self.col = 0;
-        self.clear();
+    pub fn init(self: *Terminal) void {
+        self.top = 0;
+        self.cursor = .{};
+        self.fg = .white;
+        self.bg = .black;
+        @memset(&self.cells, vga.Entry.init(' ', self.fg, self.bg));
     }
 
-    pub fn clear(self: *Terminal) void {
-        const blank = vga.Entry.init(' ', self.fg, self.bg);
-        @memset(&self.cells, blank);
-        self.row = 0;
-        self.col = 0;
+    fn isActive(self: *const Terminal) bool {
+        return self == &terms[current];
     }
 
-    pub fn putChar(self: *Terminal, c: u8) void {
-        switch (c) {
-            '\n' => self.newline(),
-            '\r' => self.col = 0,
-            8 => self.backspace(),
-            '\t' => {
-                const next = (self.col + 8) & ~@as(usize, 7);
-                while (self.col < next and self.col < vga.width) self.putChar(' ');
-            },
-            else => {
-                self.cells[self.row * vga.width + self.col] =
-                    vga.Entry.init(c, self.fg, self.bg);
-                self.col += 1;
-                if (self.col == vga.width) self.newline();
-            },
+    fn view(self: *Terminal) *[visible]vga.Entry {
+        return self.cells[self.top * vga.width ..][0..visible];
+    }
+
+    fn newline(self: *Terminal) void {
+        self.cursor.col = 0;
+        if (self.cursor.row + 1 < vga.height) {
+            self.cursor.row += 1;
+            return;
         }
-        self.printk("je suis dans putchar\n", .{});
+        if (self.top + vga.height < history) {
+            self.top += 1;
+        } else {
+            // historique plein : on décale tout d'une ligne
+            @memmove(self.cells[0 .. vga.width * (history - 1)], self.cells[vga.width..]);
+        }
+        const blank = vga.Entry.init(' ', self.fg, self.bg);
+        @memset(self.view()[vga.width * (vga.height - 1) ..], blank);
+        if (self.isActive()) self.flush();
+    }
+
+    pub fn backspace(self: *Terminal) void {
+        if (self.cursor.col > 0) {
+            self.cursor.col -= 1;
+        } else if (self.cursor.row > 0) {
+            self.cursor.row -= 1;
+            self.cursor.col = vga.width - 1;
+        } else return;
+        const e = vga.Entry.init(' ', self.fg, self.bg);
+        self.cells[self.cursor.row * vga.width + self.cursor.col] = e;
+        if (self.isActive()) vga.write(self.cursor.col, self.cursor.row, e);
     }
 
     pub fn putCharColor(self: *Terminal, c: u8, fg: vga.Color, bg: vga.Color) void {
         switch (c) {
             '\n' => self.newline(),
-            '\r' => self.col = 0,
+            '\r' => self.cursor.col = 0,
             8 => self.backspace(),
             '\t' => {
-                const next = (self.col + 8) & ~@as(usize, 7);
-                while (self.col < next and self.col < vga.width) self.putChar(' ');
+                const n = 8 - (self.cursor.col % 8);
+                for (0..n) |_| self.putCharColor(' ', fg, bg);
             },
             else => {
-                self.cells[self.row * vga.width + self.col] =
-                    vga.Entry.init(c, fg, bg);
-                self.col += 1;
-                if (self.col == vga.width) self.newline();
+                const i = self.cursor.row * vga.width + self.cursor.col;
+                const e = vga.Entry.init(c, fg, bg);
+                self.view()[i] = e;
+                if (self.isActive()) vga.write(self.cursor.col, self.cursor.row, e);
+                self.cursor.col += 1;
+                if (self.cursor.col == vga.width) self.newline();
             },
         }
     }
 
-    pub fn backspace(self: *Terminal) void {
-        if (self.col > 0) {
-            self.col -= 1;
-        } else if (self.row > 0) {
-            self.row -= 1;
-            self.col = vga.width - 1;
-        } else return;
-        self.cells[self.row * vga.width + self.col] =
-            vga.Entry.init(' ', self.fg, self.bg);
-    }
-
-    fn newline(self: *Terminal) void {
-        self.col = 0;
-        if (self.row + 1 < vga.height) {
-            self.row += 1;
-            return;
-        }
-        const w = vga.width;
-        @memmove(self.cells[0 .. w * (vga.height - 1)], self.cells[w..]);
-        const blank = vga.Entry.init(' ', self.fg, self.bg);
-        @memset(self.cells[w * (vga.height - 1) ..], blank);
+    pub fn putChar(self: *Terminal, c: u8) void {
+        self.putCharColor(c, self.fg, self.bg);
     }
 
     pub fn write(self: *Terminal, s: []const u8) void {
@@ -123,11 +140,10 @@ pub const Terminal = struct {
         var buf: [1024]u8 = undefined;
         const s = std.fmt.bufPrint(&buf, fmt, args) catch "<fmt overflow>";
         self.writeColor(s, .white, .red);
-        self.flush();
     }
 
-    pub fn flush(self: *const Terminal) void {
-        vga.blit(&self.cells);
-        vga.setCursor(self.col, self.row);
+    pub fn flush(self: *Terminal) void {
+        vga.blit(self.view());
+        self.cursor.sync();
     }
 };

@@ -1,7 +1,6 @@
 const vga = @import("drivers/vga.zig");
 const pic = @import("arch/x86/pic.zig");
-const debug = @import("debug.zig");
-
+const terminal = @import("terminal.zig");
 const keyboard = @import("drivers/keyboard.zig");
 
 /// Ce que isr_common a empilé, en adresses croissantes.
@@ -49,20 +48,9 @@ pub fn initIRQ() void {
 }
 
 fn exception(frame: *const Frame) noreturn {
-    debug.putStr(0, 0, "EXCEPTION ");
-    putHex(10, 0, frame.vector);
-    debug.putStr(0, 1, "ERR ");
-    putHex(4, 1, frame.error_code);
-    debug.putStr(0, 2, "EIP ");
-    putHex(4, 2, frame.eip);
+    const t = terminal.active();
+    t.printk("EXCEPTION 0x{x:0>2}\n", .{frame.vector});
+    t.printk("ERR 0x{x:0>8}\n", .{frame.error_code});
+    t.printk("EIP 0x{x:0>8}\n", .{frame.eip});
     while (true) asm volatile ("cli; hlt");
-}
-
-fn putHex(x: usize, y: usize, v: u32) void {
-    const digits = "0123456789ABCDEF";
-    for (0..8) |i| {
-        const shift: u5 = @intCast((7 - i) * 4);
-        const nibble: usize = (v >> shift) & 0xF;
-        vga.write(x + i, y, vga.Entry.init(digits[nibble], .white, .red));
-    }
 }

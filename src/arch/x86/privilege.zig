@@ -5,4 +5,5 @@ pub const DPL = enum(u2) {
     user_mode = 3,
 };
 
+/// Offset of the kernel code segment in the GDT
 pub const KERNEL_CS: u16 = 0x08;

@@ -1,46 +1,21 @@
 const input = @import("input.zig");
 const terminal = @import("terminal.zig");
 
-const Line = struct {
-    str: [256]u8 = undefined,
-    len: usize = 0,
-    cap: usize = 256,
-
-    fn append(self: *Line, c: u8) void {
-        self.str[self.len] = c;
-        self.len += 1;
-    }
-
-    fn pop(self: *Line) u8 {
-        const idx = self.len;
-        self.len -= 1;
-        return self.str[idx];
-    }
-
-    fn take(self: *Line) []const u8 {
-        const len = self.len;
-        self.len = 0;
-        return self.str[0..len];
-    }
-};
-
-var line: Line = .{};
-
 pub fn handle(key: input.Key) ?[]const u8 {
-    const t = terminal.active();
+    const current_term = terminal.active();
     switch (key) {
         .fkey => |n| terminal.switchTo(n),
-        .char => |c| if (line.len < line.cap) {
-            line.append(c);
-            t.putChar(c);
+        .char => |c| if (current_term.line.len < current_term.line.cap) {
+            current_term.line.append(c);
+            current_term.putChar(c);
         },
-        .backspace => if (line.len > 0) {
-            _ = line.pop();
-            t.backspace();
+        .backspace => if (current_term.line.len > 0) {
+            _ = current_term.line.pop();
+            current_term.backspace();
         },
         .enter => {
-            t.putChar('\n');
-            return line.take();
+            current_term.putChar('\n');
+            return current_term.line.take();
         },
     }
     return null;

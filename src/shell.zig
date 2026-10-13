@@ -17,11 +17,11 @@ const Command = struct {
 
 const commands = [_]Command{
     .{ .name = "clear", .help = "clear the screen", .run = cmdClear },
-    .{ .name = "echo", .help = "display a line of text", .run = echo },
+    .{ .name = "echo", .help = "display a line of text", .run = cmdEcho },
     .{ .name = "help", .help = "show all commands", .run = cmdHelp },
 };
 
-fn echo(args: []const u8) void {
+fn cmdEcho(args: []const u8) void {
     terminal.active().print("{s}\n", .{args});
 }
 

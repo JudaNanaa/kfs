@@ -69,7 +69,7 @@ pub fn handler() void {
             caps_lock = !caps_lock;
         },
         SC_F1...SC_F10 => if (!is_break) {
-            input.push(.{ .fkey = scancode - SC_F1 }); // 0 pour F1, 1 pour F2...
+            input.push(.{ .fkey = scancode - SC_F1 });
         },
         else => if (!is_break) {
             const c = translate(scancode);

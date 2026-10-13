@@ -24,6 +24,29 @@ pub fn switchTo(i: usize) void {
     terms[current].flush();
 }
 
+pub const Line = struct {
+    str: [256]u8 = undefined,
+    len: usize = 0,
+    cap: usize = 256,
+
+    pub fn append(self: *Line, c: u8) void {
+        self.str[self.len] = c;
+        self.len += 1;
+    }
+
+    pub fn pop(self: *Line) u8 {
+        const idx = self.len;
+        self.len -= 1;
+        return self.str[idx];
+    }
+
+    pub fn take(self: *Line) []const u8 {
+        const len = self.len;
+        self.len = 0;
+        return self.str[0..len];
+    }
+};
+
 const Cursor = struct {
     row: usize = 0,
     col: usize = 0,
@@ -47,6 +70,7 @@ pub const Terminal = struct {
     const visible = vga.width * vga.height;
 
     cells: [vga.width * history]vga.Entry = undefined,
+    line: Line = .{},
     /// First visible line
     top: usize = 0,
     cursor: Cursor = .{},
@@ -55,6 +79,7 @@ pub const Terminal = struct {
 
     pub fn init(self: *Terminal) void {
         self.top = 0;
+        self.line = .{};
         self.cursor = .{};
         self.fg = .white;
         self.bg = .black;

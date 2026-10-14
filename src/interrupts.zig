@@ -1,6 +1,6 @@
 const vga = @import("drivers/vga.zig");
 const pic = @import("arch/x86/pic.zig");
-const terminal = @import("terminal.zig");
+const multiplexer = @import("multiplexer.zig");
 const keyboard = @import("drivers/keyboard.zig");
 
 const IRQ = struct {
@@ -78,9 +78,9 @@ pub fn initIRQ() void {
 }
 
 fn exception(frame: *const Frame) noreturn {
-    const t = terminal.active();
-    t.printk("EXCEPTION 0x{x:0>2}\n", .{frame.vector});
-    t.printk("ERR 0x{x:0>8}\n", .{frame.error_code});
-    t.printk("EIP 0x{x:0>8}\n", .{frame.eip});
+    var mux = multiplexer.mux;
+    mux.printkAll("EXCEPTION 0x{x:0>2}\n", .{frame.vector});
+    mux.printkAll("ERR 0x{x:0>8}\n", .{frame.error_code});
+    mux.printkAll("EIP 0x{x:0>8}\n", .{frame.eip});
     while (true) asm volatile ("cli; hlt");
 }

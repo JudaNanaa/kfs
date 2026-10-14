@@ -2,10 +2,11 @@ pub const Key = union(enum) {
     char: u8,
     backspace,
     enter,
-    up,
-    down,
-    left,
-    right,
+    escape,
+    // up,
+    // down,
+    // left,
+    // right,
     /// F1..F12, ou Alt+n
     fkey: u8,
 };

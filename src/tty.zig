@@ -64,6 +64,7 @@ pub const TTY = struct {
         self.draft = .{};
         self.browsing = 0;
         self.shell = .init(self);
+        self.shell.prompt();
     }
 
     pub fn receveKey(self: *TTY, key: input.Key) void {

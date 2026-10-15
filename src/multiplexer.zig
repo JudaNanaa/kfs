@@ -1,6 +1,7 @@
 const std = @import("std");
 const input = @import("input.zig");
 const terminal = @import("terminal.zig");
+const tty = @import("tty.zig");
 
 const Mode = enum {
     normal,
@@ -22,15 +23,19 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
         const Self = @This();
 
         mode: Mode,
-        current_terminal: usize,
+        current_tty: usize,
         show_status: bool,
-        terminals: [nb_terms]terminal.Terminal,
+        ttys: [nb_terms]tty.TTY,
 
         pub fn init(self: *Self) void {
             self.mode = .normal;
-            self.current_terminal = 0;
+            self.current_tty = 0;
             self.show_status = true;
-            for (&self.terminals) |*ter| ter.* = .init();
+
+            for (&self.ttys) |*_tty| {
+                _tty.init();
+            }
+            self.currentTTY().flush();
         }
 
         fn handle(self: *Self, key: input.Key) void {
@@ -43,24 +48,25 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
         fn normalHandler(self: *Self, key: input.Key) void {
             switch (key) {
                 .escape => self.mode.change(),
-                else => self.current_term().receveKey(key),
+                else => self.currentTTY().receveKey(key),
             }
         }
 
         fn selectHandler(self: *Self, key: input.Key) void {
             switch (key) {
                 .escape => self.mode.change(),
-                .fkey => |n| self.switchTerm(n),
+                .fkey => |n| self.switchTTY(n),
                 .char, .backspace, .enter => {},
             }
         }
 
-        fn switchTerm(self: *Self, to: u8) void {
-            self.current_terminal = to;
+        fn switchTTY(self: *Self, to: u8) void {
+            self.current_tty = to;
+            self.currentTTY().flush();
         }
 
-        fn current_term(self: *Self) *terminal.Terminal {
-            return &self.terminals[self.current_terminal];
+        fn currentTTY(self: *Self) *tty.TTY {
+            return &self.ttys[self.current_tty];
         }
 
         pub fn run(self: *Self) noreturn {
@@ -74,14 +80,14 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
         }
 
         pub fn printAll(self: *Self, comptime fmt: []const u8, args: anytype) void {
-            for (&self.terminals) |*term| {
-                term.print(fmt, args);
+            for (&self.ttys) |*_tty| {
+                _tty.print(fmt, args);
             }
         }
 
         pub fn printkAll(self: *Self, comptime fmt: []const u8, args: anytype) void {
-            for (&self.terminals) |*term| {
-                term.printk(fmt, args);
+            for (&self.ttys) |*_tty| {
+                _tty.printk(fmt, args);
             }
         }
     };

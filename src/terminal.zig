@@ -22,11 +22,10 @@ const Cursor = struct {
 };
 
 pub const Terminal = struct {
-    const history = 1000;
+    const history = 128;
     const visible = vga.width * vga.height;
 
     cells: [vga.width * history]vga.Entry = undefined,
-    shell: shell.Shell = .{},
     /// First visible line
     top: usize = 0,
     cursor: Cursor = .{},
@@ -34,9 +33,10 @@ pub const Terminal = struct {
     bg: vga.Color = .black,
 
     pub fn init() Terminal {
-        var self: Terminal = .{};
+        var self: Terminal = .{
+            .cells = undefined,
+        };
         @memset(&self.cells, vga.Entry.init(' ', self.fg, self.bg));
-        self.shell = .init(&self);
         return self;
     }
 
@@ -105,7 +105,6 @@ pub const Terminal = struct {
                     self.newline();
             },
         }
-        self.cursor.sync();
     }
 
     pub fn putChar(self: *Terminal, c: u8) void {
@@ -135,9 +134,5 @@ pub const Terminal = struct {
     pub fn flush(self: *Terminal) void {
         vga.blit(self.view());
         self.cursor.sync();
-    }
-
-    pub fn receveKey(self: *Terminal, key: input.Key) void {
-        self.shell.receveKey(key);
     }
 };

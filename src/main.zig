@@ -15,5 +15,6 @@ export fn kernel_main() callconv(.c) void {
 
     var mux = multiplexer.mux;
     mux.init();
+    // @panic("je suis ici");
     mux.run();
 }

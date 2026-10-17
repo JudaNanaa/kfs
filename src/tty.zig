@@ -13,9 +13,11 @@ pub const Line = struct {
         self.len += 1;
     }
 
-    pub fn pop(self: *Line) u8 {
-        const idx = self.len;
+    pub fn pop(self: *Line) ?u8 {
+        if (self.len == 0)
+            return null;
         self.len -= 1;
+        const idx = self.len;
         return self.str[idx];
     }
 
@@ -64,7 +66,7 @@ pub const TTY = struct {
         self.draft = .{};
         self.browsing = 0;
         self.shell = .init(self);
-        self.shell.prompt();
+        self.prompt();
     }
 
     pub fn receveKey(self: *TTY, key: input.Key) void {
@@ -76,20 +78,25 @@ pub const TTY = struct {
             },
             .backspace => {
                 self.browsing = 0;
-                _ = self.line.pop();
-                self.term.backspace();
+                if (self.line.pop() != null) {
+                    self.term.backspace();
+                }
             },
             .enter => {
-                self.term.putChar('\n');
+                self.term.newline();
                 if (!self.line.isEmpty())
                     self.history.push(&self.line);
                 const cmd = self.line.take();
                 self.browsing = 0;
                 self.shell.execute(cmd);
-                self.shell.prompt();
+                self.prompt();
             },
             else => {},
         }
+    }
+
+    pub fn prompt(self: *TTY) void {
+        return self.write("> ");
     }
 
     pub fn flush(self: *TTY) void {

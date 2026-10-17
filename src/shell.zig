@@ -35,10 +35,6 @@ pub const Shell = struct {
         return .{ .tty = _tty };
     }
 
-    pub fn prompt(self: *Shell) void {
-        return self.tty.write("> ");
-    }
-
     pub fn execute(self: *Shell, line: []const u8) void {
         const trimmed = std.mem.trim(u8, line, " ");
         if (trimmed.len == 0) return;

@@ -48,7 +48,10 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
         fn normalHandler(self: *Self, key: input.Key) void {
             switch (key) {
                 .escape => self.mode.change(),
-                else => self.currentTTY().receveKey(key),
+                else => {
+                    self.currentTTY().receveKey(key);
+                    self.currentTTY().flush();
+                },
             }
         }
 

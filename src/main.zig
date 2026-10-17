@@ -8,13 +8,19 @@ const int = @import("interrupts.zig");
 
 const shell = @import("shell.zig");
 
+const serial = @import("drivers/serial.zig");
+
 export fn kernel_main() callconv(.c) void {
+    serial.init();
     gdt.init();
+    serial.print("la gdt est init\n", .{});
     idt.init();
     int.initIRQ();
+    serial.print("les interrupts sont set\n", .{});
 
-    var mux = multiplexer.mux;
+    var mux = &multiplexer.mux;
     mux.init();
     // @panic("je suis ici");
+    serial.print("le multi plexer est init\n", .{});
     mux.run();
 }

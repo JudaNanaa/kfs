@@ -38,6 +38,11 @@ pub fn write(x: usize, y: usize, entry: Entry) void {
     mmio[y * width + x] = entry;
 }
 
+pub fn blitRow(row: usize, cells: *const [width]Entry) void {
+    const base = row * width;
+    for (cells, 0..) |e, i| mmio[base + i] = e;
+}
+
 pub fn blit(cells: *const [width * height]Entry) void {
     for (cells, 0..) |e, i| mmio[i] = e;
 }

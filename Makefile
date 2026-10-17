@@ -7,7 +7,7 @@ $(NAME):
 	zig build
 
 run: all
-	qemu-system-i386 -kernel $(ELF) 
+	qemu-system-i386 -kernel $(ELF) -serial stdio 
 
 debug: all
 	qemu-system-i386 -kernel $(ELF) -accel tcg -d int,cpu_reset -no-reboot

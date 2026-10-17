@@ -31,6 +31,7 @@ pub const Terminal = struct {
     cursor: Cursor = .{},
     fg: vga.Color = .white,
     bg: vga.Color = .black,
+    dirty_rows: u32 = 0xFFFFFFFF,
 
     pub fn init() Terminal {
         var self: Terminal = .{
@@ -44,19 +45,15 @@ pub const Terminal = struct {
         return self.cells[self.top * vga.width ..][0..visible];
     }
 
-    fn writeToVGA(self: *Terminal, entry: vga.Entry) void {
-        vga.write(self.cursor.col, self.cursor.row, entry);
-        self.cursor.sync();
-    }
-
     pub fn clear(self: *Terminal) void {
         @memset(&self.cells, vga.Entry.init(' ', self.fg, self.bg));
         self.top = 0;
         self.cursor = .{};
+        self.markAllDirty();
         self.flush();
     }
 
-    fn newline(self: *Terminal) void {
+    pub fn newline(self: *Terminal) void {
         self.cursor.col = 0;
         if (self.cursor.row + 1 < vga.height) {
             self.cursor.row += 1;
@@ -69,6 +66,7 @@ pub const Terminal = struct {
         }
         const blank = vga.Entry.init(' ', self.fg, self.bg);
         @memset(self.view()[vga.width * (vga.height - 1) ..], blank);
+        self.markAllDirty();
         self.flush();
     }
 
@@ -81,7 +79,7 @@ pub const Terminal = struct {
         } else return;
         const entry = vga.Entry.init(' ', self.fg, self.bg);
         self.view()[self.cursor.row * vga.width + self.cursor.col] = entry;
-        self.writeToVGA(entry);
+        self.markDirty(self.cursor.row);
     }
 
     pub fn putCharColor(self: *Terminal, c: u8, fg: vga.Color, bg: vga.Color) void {
@@ -96,15 +94,21 @@ pub const Terminal = struct {
             },
             else => {
                 const i = self.cursor.row * vga.width + self.cursor.col;
-                const entry = vga.Entry.init(c, fg, bg);
-                self.view()[i] = entry;
-                self.writeToVGA(entry);
-
+                self.view()[i] = vga.Entry.init(c, fg, bg);
                 self.cursor.col += 1;
                 if (self.cursor.col == vga.width)
                     self.newline();
+                self.markDirty(self.cursor.row);
             },
         }
+    }
+
+    fn markDirty(self: *Terminal, row: usize) void {
+        self.dirty_rows |= @as(u32, 1) << @intCast(row);
+    }
+
+    fn markAllDirty(self: *Terminal) void {
+        self.dirty_rows = std.math.maxInt(u32);
     }
 
     pub fn putChar(self: *Terminal, c: u8) void {
@@ -132,7 +136,15 @@ pub const Terminal = struct {
     }
 
     pub fn flush(self: *Terminal) void {
-        vga.blit(self.view());
+        const _view = self.view();
+        for (0..vga.height) |row| {
+            const mask = @as(u32, 1) << @intCast(row);
+            if (self.dirty_rows & mask != 0) {
+                // tranche de 80 entrées à partir de l'offset de la ligne
+                vga.blitRow(row, _view[row * vga.width ..][0..vga.width]);
+            }
+        }
+        self.dirty_rows = 0;
         self.cursor.sync();
     }
 };

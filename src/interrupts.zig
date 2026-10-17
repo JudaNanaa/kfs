@@ -78,7 +78,7 @@ pub fn initIRQ() void {
 }
 
 fn exception(frame: *const Frame) noreturn {
-    var mux = multiplexer.mux;
+    var mux = &multiplexer.mux;
     mux.printkAll("EXCEPTION 0x{x:0>2}\n", .{frame.vector});
     mux.printkAll("ERR 0x{x:0>8}\n", .{frame.error_code});
     mux.printkAll("EIP 0x{x:0>8}\n", .{frame.eip});

@@ -3,10 +3,10 @@ pub const Key = union(enum) {
     backspace,
     enter,
     escape,
-    // up,
-    // down,
-    // left,
-    // right,
+    up,
+    down,
+    left,
+    right,
     /// F1..F12, ou Alt+n
     fkey: u8,
 };

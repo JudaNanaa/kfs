@@ -18,6 +18,15 @@ const Mode = enum {
 const Mux = Multiplexer(4);
 pub var mux: Mux = undefined;
 
+const status = @import("status.zig");
+
+fn modeLabel(m: Mode) []const u8 {
+    return switch (m) {
+        .normal => "-- INSERT --",
+        .select => "-- NORMAL --",
+    };
+}
+
 pub fn Multiplexer(comptime nb_terms: usize) type {
     return struct {
         const Self = @This();
@@ -36,6 +45,7 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
                 _tty.init();
             }
             self.currentTTY().flush();
+            self.drawStatus();
         }
 
         fn handle(self: *Self, key: input.Key) void {
@@ -47,7 +57,10 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
 
         fn normalHandler(self: *Self, key: input.Key) void {
             switch (key) {
-                .escape => self.mode.change(),
+                .escape => {
+                    self.mode.change();
+                    self.drawStatus();
+                },
                 else => {
                     self.currentTTY().receveKey(key);
                     self.currentTTY().flush();
@@ -57,19 +70,59 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
 
         fn selectHandler(self: *Self, key: input.Key) void {
             switch (key) {
-                .escape => self.mode.change(),
+                .escape => {
+                    self.mode.change();
+                    self.drawStatus();
+                },
                 .fkey => |n| self.switchTTY(n),
+                .right => self.switchTTYToRight(),
+                .left => self.switchTTYToLeft(),
+                .down => {
+                    self.currentTTY().scroll(.down);
+                    self.currentTTY().flush();
+                },
+                .up => {
+                    self.currentTTY().scroll(.up);
+                    self.currentTTY().flush();
+                },
                 .char, .backspace, .enter => {},
             }
         }
 
-        fn switchTTY(self: *Self, to: u8) void {
-            self.current_tty = to;
+        fn switchTTYToRight(self: *Self) void {
+            if (self.current_tty + 1 >= self.ttys.len) return;
+
+            self.current_tty += 1;
             self.currentTTY().flush();
+            self.drawStatus();
+        }
+
+        fn switchTTYToLeft(self: *Self) void {
+            if (self.current_tty == 0) return;
+
+            self.current_tty -= 1;
+            self.currentTTY().flush();
+            self.drawStatus();
+        }
+
+        fn switchTTY(self: *Self, index: u8) void {
+            if (index >= self.ttys.len or index == self.current_tty) return;
+
+            self.current_tty = index;
+            self.currentTTY().flush();
+            self.drawStatus();
         }
 
         fn currentTTY(self: *Self) *tty.TTY {
             return &self.ttys[self.current_tty];
+        }
+
+        fn drawStatus(self: *Self) void {
+            if (self.show_status) {
+                status.draw(self.current_tty, self.ttys.len, modeLabel(self.mode), "esc:mode F1-F4:tty F10:bar");
+            } else {
+                status.clear();
+            }
         }
 
         pub fn run(self: *Self) noreturn {

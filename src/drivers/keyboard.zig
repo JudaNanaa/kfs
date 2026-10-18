@@ -46,6 +46,11 @@ fn translate(scancode: u8) u8 {
 const SC_F1 = 0x3B;
 const SC_F10 = 0x44;
 const SC_LALT = 0x38;
+const SC_ESC = 0x01;
+const SC_UP: u8 = 0x48;
+const SC_DOWN: u8 = 0x50;
+const SC_LEFT: u8 = 0x4B;
+const SC_RIGHT: u8 = 0x4D;
 
 pub fn handler() void {
     const data = io.inb(KBD_DATA);
@@ -56,6 +61,18 @@ pub fn handler() void {
     }
     if (extended) {
         extended = false;
+
+        const ext_break = data & 0x80 != 0;
+        const ext_code = data & 0x7F;
+        if (ext_break) return;
+
+        switch (ext_code) {
+            SC_UP => input.push(.up),
+            SC_DOWN => input.push(.down),
+            SC_LEFT => input.push(.left),
+            SC_RIGHT => input.push(.right),
+            else => {},
+        }
         return;
     }
 
@@ -70,6 +87,9 @@ pub fn handler() void {
         },
         SC_F1...SC_F10 => if (!is_break) {
             input.push(.{ .fkey = scancode - SC_F1 });
+        },
+        SC_ESC => if (!is_break) {
+            input.push(.escape);
         },
         else => if (!is_break) {
             const c = translate(scancode);

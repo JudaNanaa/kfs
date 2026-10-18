@@ -95,6 +95,10 @@ pub const TTY = struct {
         }
     }
 
+    pub fn scroll(self: *TTY, direction: terminal.Terminal.ScrollDirection) void {
+        self.term.scroll(direction);
+    }
+
     pub fn prompt(self: *TTY) void {
         return self.write("> ");
     }

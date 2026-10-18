@@ -23,7 +23,8 @@ const Cursor = struct {
 
 pub const Terminal = struct {
     const history = 128;
-    const visible = vga.width * vga.height;
+    pub const text_height = vga.height - 1;
+    const visible = vga.width * text_height;
 
     cells: [vga.width * history]vga.Entry = undefined,
     /// First visible line
@@ -55,17 +56,17 @@ pub const Terminal = struct {
 
     pub fn newline(self: *Terminal) void {
         self.cursor.col = 0;
-        if (self.cursor.row + 1 < vga.height) {
+        if (self.cursor.row + 1 < text_height) {
             self.cursor.row += 1;
             return;
         }
-        if (self.top + vga.height < history) {
+        if (self.top + text_height < history) {
             self.top += 1;
         } else {
             @memmove(self.cells[0 .. vga.width * (history - 1)], self.cells[vga.width..]);
         }
         const blank = vga.Entry.init(' ', self.fg, self.bg);
-        @memset(self.view()[vga.width * (vga.height - 1) ..], blank);
+        @memset(self.view()[vga.width * (text_height - 1) ..], blank);
         self.markAllDirty();
         self.flush();
     }
@@ -103,6 +104,25 @@ pub const Terminal = struct {
         }
     }
 
+    pub const ScrollDirection = enum {
+        up,
+        down,
+    };
+
+    pub fn scroll(self: *Terminal, direction: ScrollDirection) void {
+        switch (direction) {
+            .up => {
+                if (self.top == 0) return;
+                self.top -= 1;
+            },
+            .down => {
+                if (self.top + 1 + text_height >= history) return;
+                self.top += 1;
+            },
+        }
+        self.markAllDirty();
+    }
+
     fn markDirty(self: *Terminal, row: usize) void {
         self.dirty_rows |= @as(u32, 1) << @intCast(row);
     }
@@ -137,7 +157,7 @@ pub const Terminal = struct {
 
     pub fn flush(self: *Terminal) void {
         const _view = self.view();
-        for (0..vga.height) |row| {
+        for (0..text_height) |row| {
             const mask = @as(u32, 1) << @intCast(row);
             if (self.dirty_rows & mask != 0) {
                 // tranche de 80 entrées à partir de l'offset de la ligne

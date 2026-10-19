@@ -152,7 +152,7 @@ pub const Terminal = struct {
                 self.top -= 1;
             },
             .down => {
-                if (self.top + text_height + 1 >= self.bottom) return;
+                if (self.top + text_height - 1 >= self.bottom) return;
                 self.top += 1;
             },
         }

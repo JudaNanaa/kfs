@@ -21,13 +21,15 @@ pub const Line = struct {
     }
 
     pub fn remove(self: *Line, idx: usize) ?u8 {
+        if (idx == 0) return null;
         if (idx >= self.cap or idx > self.len) return null;
 
         if (idx == self.len) {
             return self.pop();
         }
+
         const c = self.str[idx];
-        @memmove(self.str[idx .. self.cap - 1], self.str[idx + 1 .. self.cap]);
+        @memmove(self.str[idx - 1 .. self.cap - 1], self.str[idx..self.cap]);
 
         self.len -= 1;
 

@@ -3,21 +3,29 @@ const terminal = @import("terminal.zig");
 const shell = @import("shell.zig");
 const std = @import("std");
 
+const serial = @import("drivers/serial.zig");
+
 pub const Line = struct {
     str: [256]u8 = undefined,
     len: usize = 0,
     cap: usize = 256,
 
     pub fn insert(self: *Line, idx: usize, c: u8) void {
+        serial.print("je suis dans insert\n", .{});
+        serial.print("idx == {}", .{idx});
+        serial.print("self.cap == {}", .{self.cap});
+        serial.print("self.len == {}", .{self.len});
         if (idx >= self.cap or idx > self.len) return;
 
         if (idx == self.len) {
             self.append(c);
-            return;
+        } else {
+            @memmove(self.str[idx + 1 .. self.cap], self.str[idx .. self.cap - 1]);
+            self.str[idx] = c;
+            self.len += 1;
         }
-        @memmove(self.str[idx + 1 .. self.cap], self.str[idx .. self.cap - 1]);
-        self.str[idx] = c;
-        self.len += 1;
+
+        serial.print("str == {s}\n", .{self.str[0..self.len]});
     }
 
     pub fn remove(self: *Line, idx: usize) ?u8 {
@@ -34,6 +42,11 @@ pub const Line = struct {
         self.len -= 1;
 
         return c;
+    }
+
+    pub fn change(self: *Line, str: []const u8) void {
+        @memcpy(self.str[0..], str);
+        self.len = str.len;
     }
 
     pub fn append(self: *Line, c: u8) void {
@@ -68,19 +81,23 @@ pub const Line = struct {
 const History = struct {
     const capacity = 32;
 
-    lines: [capacity]Line = undefined,
+    lines: [capacity]Line = @splat(.{}),
     head: usize = 0,
     len: usize = 0,
 
-    fn push(self: *History, line: *const Line) void {
-        self.lines[self.head] = line.*;
+    fn addHistory(self: *History) void {
         self.head = (self.head + 1) % capacity;
-        if (self.len < capacity) self.len += 1;
+        self.len += 1;
     }
 
     fn get(self: *const History, back: usize) ?*const Line {
+        serial.print("back == {}", .{back});
         if (back == 0 or back > self.len) return null;
-        return &self.lines[(self.head + capacity - back) % capacity];
+        return &self.lines[(self.head - back) % self.len];
+    }
+
+    fn currentLine(self: *History) *Line {
+        return &self.lines[self.head];
     }
 };
 
@@ -89,17 +106,15 @@ pub const TTY = struct {
 
     term: terminal.Terminal,
     history: History = .{},
-    line: Line = .{},
+    line: *Line = undefined,
     line_index: usize = 0,
-    draft: Line = .{},
     browsing: usize = 0,
     shell: shell.Shell,
 
     pub fn init(self: *TTY) void {
         self.term = .init();
         self.history = .{};
-        self.line = .{};
-        self.draft = .{};
+        self.line = self.history.currentLine();
         self.browsing = 0;
         self.line_index = 0;
         self.shell = .init(self);
@@ -123,12 +138,15 @@ pub const TTY = struct {
             },
             .enter => {
                 self.term.newline();
-                if (!self.line.isEmpty())
-                    self.history.push(&self.line);
-                const cmd = self.line.take();
+                if (!self.line.isEmpty()) {
+                    serial.print("je vais faire addHistory\n", .{});
+                    const cmd = self.line.get();
+                    self.shell.execute(cmd);
+                    self.history.addHistory();
+                    self.line = self.history.currentLine();
+                }
                 self.browsing = 0;
                 self.line_index = 0;
-                self.shell.execute(cmd);
                 self.prompt();
             },
             .left => {
@@ -144,6 +162,14 @@ pub const TTY = struct {
                 self.line_index += 1;
                 self.term.cursor.col += 1;
                 self.updateCursor();
+            },
+            .up => {
+                serial.print("je suis dans le up0\n", .{});
+                if (self.history.get(self.browsing + 1)) |line| {
+                    serial.print("je suis dans le up1\n", .{});
+                    self.browsing += 1;
+                    self.line.change(&line.str);
+                }
             },
             else => {},
         }

@@ -99,7 +99,7 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
             if (self.current_tty + 1 >= self.ttys.len) return;
 
             self.current_tty += 1;
-            self.currentTTY().flush();
+            self.currentTTY().forceFlush();
             self.drawStatus();
         }
 
@@ -107,7 +107,7 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
             if (self.current_tty == 0) return;
 
             self.current_tty -= 1;
-            self.currentTTY().flush();
+            self.currentTTY().forceFlush();
             self.drawStatus();
         }
 
@@ -115,7 +115,7 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
             if (index >= self.ttys.len or index == self.current_tty) return;
 
             self.current_tty = index;
-            self.currentTTY().flush();
+            self.currentTTY().forceFlush();
             self.drawStatus();
         }
 

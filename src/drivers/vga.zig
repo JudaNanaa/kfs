@@ -43,7 +43,7 @@ pub fn blitRow(row: usize, cells: *const [width]Entry) void {
     for (cells, 0..) |e, i| mmio[base + i] = e;
 }
 
-pub fn blit(cells: *const [width * height]Entry) void {
+pub fn blit(cells: *const [width * (height - 1)]Entry) void {
     for (cells, 0..) |e, i| mmio[i] = e;
 }
 

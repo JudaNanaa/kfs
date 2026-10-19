@@ -8,6 +8,32 @@ pub const Line = struct {
     len: usize = 0,
     cap: usize = 256,
 
+    pub fn insert(self: *Line, idx: usize, c: u8) void {
+        if (idx >= self.cap or idx > self.len) return;
+
+        if (idx == self.len) {
+            self.append(c);
+            return;
+        }
+        @memmove(self.str[idx + 1 .. self.cap], self.str[idx .. self.cap - 1]);
+        self.str[idx] = c;
+        self.len += 1;
+    }
+
+    pub fn remove(self: *Line, idx: usize) ?u8 {
+        if (idx >= self.cap or idx > self.len) return null;
+
+        if (idx == self.len) {
+            return self.pop();
+        }
+        const c = self.str[idx];
+        @memmove(self.str[idx .. self.cap - 1], self.str[idx + 1 .. self.cap]);
+
+        self.len -= 1;
+
+        return c;
+    }
+
     pub fn append(self: *Line, c: u8) void {
         self.str[self.len] = c;
         self.len += 1;
@@ -24,6 +50,11 @@ pub const Line = struct {
     pub fn take(self: *Line) []const u8 {
         const len = self.len;
         self.len = 0;
+        return self.str[0..len];
+    }
+
+    pub fn get(self: *Line) []const u8 {
+        const len = self.len;
         return self.str[0..len];
     }
 
@@ -52,9 +83,12 @@ const History = struct {
 };
 
 pub const TTY = struct {
+    const PROMPT = "> ";
+
     term: terminal.Terminal,
     history: History = .{},
     line: Line = .{},
+    line_index: usize = 0,
     draft: Line = .{},
     browsing: usize = 0,
     shell: shell.Shell,
@@ -65,6 +99,7 @@ pub const TTY = struct {
         self.line = .{};
         self.draft = .{};
         self.browsing = 0;
+        self.line_index = 0;
         self.shell = .init(self);
         self.prompt();
     }
@@ -73,12 +108,14 @@ pub const TTY = struct {
         switch (key) {
             .char => |c| {
                 self.browsing = 0;
-                self.line.append(c);
+                self.line.insert(self.line_index, c);
+                self.line_index += 1;
                 self.term.putChar(c);
             },
             .backspace => {
                 self.browsing = 0;
-                if (self.line.pop() != null) {
+                if (self.line.remove(self.line_index) != null) {
+                    self.line_index -= 1;
                     self.term.backspace();
                 }
             },
@@ -88,8 +125,23 @@ pub const TTY = struct {
                     self.history.push(&self.line);
                 const cmd = self.line.take();
                 self.browsing = 0;
+                self.line_index = 0;
                 self.shell.execute(cmd);
                 self.prompt();
+            },
+            .left => {
+                if (self.line_index == 0) return;
+
+                self.line_index -= 1;
+                self.term.cursor.col -= 1;
+                self.updateCursor();
+            },
+            .right => {
+                if (self.line_index >= self.line.len) return;
+
+                self.line_index += 1;
+                self.term.cursor.col += 1;
+                self.updateCursor();
             },
             else => {},
         }
@@ -116,7 +168,11 @@ pub const TTY = struct {
     }
 
     pub fn prompt(self: *TTY) void {
-        return self.write("> ");
+        return self.write(PROMPT);
+    }
+
+    pub fn forceFlush(self: *TTY) void {
+        self.term.forceFlush();
     }
 
     pub fn flush(self: *TTY) void {

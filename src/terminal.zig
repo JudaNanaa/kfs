@@ -104,8 +104,12 @@ pub const Terminal = struct {
             self.cursor.row -= 1;
             self.cursor.col = vga.width - 1;
         } else return;
-        const entry = vga.Entry.init(' ', self.fg, self.bg);
-        self.view()[self.cursor.row * vga.width + self.cursor.col] = entry;
+
+        const idx = self.top * vga.width + self.cursor.row * vga.width + self.cursor.col;
+        @memmove(self.cells[idx .. vga.width * history - 1], self.cells[idx + 1 ..]);
+
+        self.cells[vga.width * history - 1] = vga.Entry.init(' ', self.fg, self.bg);
+
         self.markDirty(self.cursor.row);
     }
 
@@ -130,12 +134,13 @@ pub const Terminal = struct {
                     self.putCharColor(' ', fg, bg);
             },
             else => {
-                const i = self.cursor.row * vga.width + self.cursor.col;
-                self.view()[i] = vga.Entry.init(c, fg, bg);
+                const i = self.top * vga.width + self.cursor.row * vga.width + self.cursor.col;
+
+                @memmove(self.cells[i + 1 .. vga.width * history], self.cells[i .. vga.width * history - 1]);
+                self.cells[i] = vga.Entry.init(c, fg, bg);
+
                 self.cursor.col += 1;
-                if (self.cursor.col == vga.width)
-                    self.newline();
-                self.markDirty(self.cursor.row);
+                self.markAllDirty();
             },
         }
     }
@@ -189,6 +194,11 @@ pub const Terminal = struct {
         var buf: [1024]u8 = undefined;
         const s = std.fmt.bufPrint(&buf, fmt, args) catch "<fmt overflow>";
         self.writeColor(s, .white, .red);
+    }
+
+    pub fn forceFlush(self: *Terminal) void {
+        vga.blit(self.view());
+        self.dirty_rows = 0;
     }
 
     pub fn flush(self: *Terminal) void {

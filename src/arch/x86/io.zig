@@ -31,3 +31,11 @@ pub fn unsetCursor() void {
     outb(0x3D4, 0x0A);
     outb(0x3D5, 0x20);
 }
+
+pub fn enableCursor(cursor_start: u8, cursor_end: u8) void {
+    outb(0x3D4, 0x0A);
+    outb(0x3D5, (inb(0x3D5) & 0xC0) | cursor_start);
+
+    outb(0x3D4, 0x0B);
+    outb(0x3D5, (inb(0x3D5) & 0xE0) | cursor_end);
+}

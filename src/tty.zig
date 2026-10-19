@@ -99,6 +99,18 @@ pub const TTY = struct {
         self.term.scroll(direction);
     }
 
+    pub fn updateCursor(self: *TTY) void {
+        self.term.updateCursor();
+    }
+
+    pub fn showCursor(self: *TTY) void {
+        self.term.showCursor();
+    }
+
+    pub fn hideCursor(self: *TTY) void {
+        self.term.hideCursor();
+    }
+
     pub fn prompt(self: *TTY) void {
         return self.write("> ");
     }

@@ -55,3 +55,7 @@ pub fn setCursor(x: usize, y: usize) void {
 pub fn unsetCursor() void {
     io.unsetCursor();
 }
+
+pub fn enableCursor() void {
+    io.enableCursor(14, 15);
+}

@@ -3,7 +3,7 @@ const vga = @import("drivers/vga.zig");
 const shell = @import("shell.zig");
 const input = @import("input.zig");
 
-const Cursor = struct {
+pub const Cursor = struct {
     row: usize = 0,
     col: usize = 0,
 
@@ -16,8 +16,17 @@ const Cursor = struct {
         self.row = 0;
     }
 
-    fn sync(self: *Cursor) void {
+    pub fn sync(self: *Cursor) void {
         vga.setCursor(self.col, self.row);
+    }
+
+    pub fn hide(_: *Cursor) void {
+        vga.unsetCursor();
+    }
+
+    pub fn show(self: *Cursor) void {
+        vga.enableCursor();
+        self.sync();
     }
 };
 
@@ -52,6 +61,18 @@ pub const Terminal = struct {
         self.cursor = .{};
         self.markAllDirty();
         self.flush();
+    }
+
+    pub fn updateCursor(self: *Terminal) void {
+        self.cursor.sync();
+    }
+
+    pub fn showCursor(self: *Terminal) void {
+        self.cursor.show();
+    }
+
+    pub fn hideCursor(self: *Terminal) void {
+        self.cursor.hide();
     }
 
     pub fn newline(self: *Terminal) void {
@@ -165,6 +186,6 @@ pub const Terminal = struct {
             }
         }
         self.dirty_rows = 0;
-        self.cursor.sync();
+        // self.cursor.sync();
     }
 };

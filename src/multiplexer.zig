@@ -45,6 +45,7 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
                 _tty.init();
             }
             self.currentTTY().flush();
+            self.currentTTY().showCursor();
             self.drawStatus();
         }
 
@@ -58,12 +59,14 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
         fn normalHandler(self: *Self, key: input.Key) void {
             switch (key) {
                 .escape => {
+                    self.currentTTY().hideCursor();
                     self.mode.change();
                     self.drawStatus();
                 },
                 else => {
                     self.currentTTY().receveKey(key);
                     self.currentTTY().flush();
+                    self.currentTTY().updateCursor();
                 },
             }
         }
@@ -71,6 +74,7 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
         fn selectHandler(self: *Self, key: input.Key) void {
             switch (key) {
                 .escape => {
+                    self.currentTTY().showCursor();
                     self.mode.change();
                     self.drawStatus();
                 },

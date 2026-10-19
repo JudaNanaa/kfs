@@ -49,8 +49,9 @@ pub fn blit(cells: *const [width * height]Entry) void {
 
 pub fn setCursor(x: usize, y: usize) void {
     const pos: u16 = @intCast(y * width + x);
-    io.outb(0x3D4, 0x0F);
-    io.outb(0x3D5, @truncate(pos));
-    io.outb(0x3D4, 0x0E);
-    io.outb(0x3D5, @truncate(pos >> 8));
+    io.setCursor(pos);
+}
+
+pub fn unsetCursor() void {
+    io.unsetCursor();
 }

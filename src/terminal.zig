@@ -38,6 +38,7 @@ pub const Terminal = struct {
     cells: [vga.width * history]vga.Entry = undefined,
     /// First visible line
     top: usize = 0,
+    bottom: usize = 0,
     cursor: Cursor = .{},
     fg: vga.Color = .white,
     bg: vga.Color = .black,
@@ -58,6 +59,7 @@ pub const Terminal = struct {
     pub fn clear(self: *Terminal) void {
         @memset(&self.cells, vga.Entry.init(' ', self.fg, self.bg));
         self.top = 0;
+        self.bottom = 0;
         self.cursor = .{};
         self.markAllDirty();
         self.flush();
@@ -77,6 +79,9 @@ pub const Terminal = struct {
 
     pub fn newline(self: *Terminal) void {
         self.cursor.col = 0;
+        if (self.bottom < history) {
+            self.bottom += 1;
+        }
         if (self.cursor.row + 1 < text_height) {
             self.cursor.row += 1;
             return;
@@ -102,6 +107,16 @@ pub const Terminal = struct {
         const entry = vga.Entry.init(' ', self.fg, self.bg);
         self.view()[self.cursor.row * vga.width + self.cursor.col] = entry;
         self.markDirty(self.cursor.row);
+    }
+
+    pub fn goToBottom(self: *Terminal) void {
+        if (self.bottom < text_height) {
+            self.top = 0;
+        } else {
+            self.top = self.bottom - text_height + 1;
+        }
+
+        self.markAllDirty();
     }
 
     pub fn putCharColor(self: *Terminal, c: u8, fg: vga.Color, bg: vga.Color) void {
@@ -137,7 +152,7 @@ pub const Terminal = struct {
                 self.top -= 1;
             },
             .down => {
-                if (self.top + 1 + text_height >= history) return;
+                if (self.top + text_height + 1 >= self.bottom) return;
                 self.top += 1;
             },
         }

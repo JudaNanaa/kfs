@@ -74,6 +74,8 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
         fn selectHandler(self: *Self, key: input.Key) void {
             switch (key) {
                 .escape => {
+                    self.currentTTY().goToBottom();
+                    self.currentTTY().flush();
                     self.currentTTY().showCursor();
                     self.mode.change();
                     self.drawStatus();

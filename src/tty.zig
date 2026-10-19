@@ -99,6 +99,10 @@ pub const TTY = struct {
         self.term.scroll(direction);
     }
 
+    pub fn goToBottom(self: *TTY) void {
+        self.term.goToBottom();
+    }
+
     pub fn updateCursor(self: *TTY) void {
         self.term.updateCursor();
     }

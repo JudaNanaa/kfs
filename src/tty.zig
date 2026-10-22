@@ -153,14 +153,14 @@ pub const TTY = struct {
                 if (self.line_index == 0) return;
 
                 self.line_index -= 1;
-                self.term.cursor.col -= 1;
+                self.term.cursor.moveLeft() catch unreachable;
                 self.updateCursor();
             },
             .right => {
                 if (self.line_index >= self.line.len) return;
 
                 self.line_index += 1;
-                self.term.cursor.col += 1;
+                self.term.cursor.moveRight() catch unreachable;
                 self.updateCursor();
             },
             .up => {

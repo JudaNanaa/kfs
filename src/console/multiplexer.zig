@@ -3,6 +3,7 @@ const input = @import("../input.zig");
 const tty = @import("tty.zig");
 const cpu = @import("../arch/x86/cpu.zig");
 const vga = @import("../drivers/vga.zig");
+const power = @import("../arch/x86/power.zig");
 
 const Mode = enum {
     normal,
@@ -54,6 +55,18 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
                 .insert => self.insertHandler(key),
             }
             self.render();
+            self.runShellRequest();
+        }
+
+        fn runShellRequest(self: *Self) void {
+            const request = self.currentTTY().shell.request orelse return;
+            switch (request) {
+                .halt => {
+                    vga.unsetCursor();
+                    power.halt();
+                },
+                .reboot => power.reboot(),
+            }
         }
 
         fn normalHandler(self: *Self, key: input.Key) void {

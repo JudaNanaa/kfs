@@ -51,7 +51,7 @@ pub const TTY = struct {
                 self.line.len = 0;
                 self.line_index = 0;
                 self.browsing = 0;
-                self.prompt();
+                if (self.shell.request == null) self.prompt();
             },
             .left => {
                 if (self.line_index == 0) return;

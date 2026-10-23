@@ -11,7 +11,19 @@ const commands = [_]Command{
     .{ .name = "clear", .help = "clear the screen", .run = cmdClear },
     .{ .name = "echo", .help = "display a line of text", .run = cmdEcho },
     .{ .name = "help", .help = "show all commands", .run = cmdHelp },
+    .{ .name = "halt", .help = "stop the CPU", .run = cmdHalt },
+    .{ .name = "reboot", .help = "restart the machine", .run = cmdReboot },
 };
+
+fn cmdHalt(_: []const u8, sh: *Shell) void {
+    sh.tty.print("System halted.\n", .{});
+    sh.request = .halt;
+}
+
+fn cmdReboot(_: []const u8, sh: *Shell) void {
+    sh.tty.print("Rebooting...\n", .{});
+    sh.request = .reboot;
+}
 
 fn cmdEcho(args: []const u8, sh: *Shell) void {
     sh.tty.print("{s}\n", .{args});
@@ -26,8 +38,12 @@ fn cmdHelp(_: []const u8, sh: *Shell) void {
         sh.tty.print("{s}\t{s}\n", .{ c.name, c.help });
 }
 
+/// Something the shell cannot do itself: it must happen after the screen is drawn.
+pub const Request = enum { halt, reboot };
+
 pub const Shell = struct {
     tty: *tty.TTY,
+    request: ?Request = null,
 
     pub fn init(_tty: *tty.TTY) Shell {
         return .{ .tty = _tty };

@@ -98,14 +98,13 @@ pub fn remap(offset1: u8, offset2: u8) void {
     io.outb(slave.data, @bitCast(icw4));
     io.wait();
 
-    // Unmask both PICs
-    io.outb(master.data, 0);
-    io.outb(slave.data, 0);
+    // Mask both PICs
+    disable();
 }
 
 pub fn disable() void {
-    io.outb(master.data, 0xff);
-    io.outb(slave.data, 0xff);
+    io.outb(master.data, 0xFF);
+    io.outb(slave.data, 0xFF);
 }
 
 fn changeMask(irq: u4, masked: bool) void {
@@ -122,4 +121,26 @@ pub fn setMask(irq: u4) void {
 
 pub fn clearMask(irq: u4) void {
     changeMask(irq, false);
+}
+
+const testing = std.testing;
+
+test "PIC: ICW1 starts init in cascade mode with ICW4 (0x11)" {
+    const icw1: ICW1 = .{ .init = true, .icw4 = true };
+    try testing.expectEqual(@as(u8, 0x11), @as(u8, @bitCast(icw1)));
+}
+
+test "PIC: ICW4 selects 8086 mode (0x01)" {
+    const icw4: ICW4 = .{ .mode_8086 = true };
+    try testing.expectEqual(@as(u8, 0x01), @as(u8, @bitCast(icw4)));
+}
+
+test "PIC: ICW4 buffered mode values" {
+    try testing.expectEqual(@as(u8, 0x08), @as(u8, @bitCast(ICW4{ .buf = .slave })));
+    try testing.expectEqual(@as(u8, 0x0C), @as(u8, @bitCast(ICW4{ .buf = .master })));
+}
+
+test "PIC: ICW3 cascade values (slave on IRQ2)" {
+    try testing.expectEqual(@as(u8, 0x04), master_cascade_mask);
+    try testing.expectEqual(@as(u8, 0x02), slave_cascade_id);
 }

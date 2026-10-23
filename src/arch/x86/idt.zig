@@ -1,7 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
 const privilege = @import("privilege.zig");
-const pic = @import("pic.zig");
 
 const GateType = enum(u4) {
     task_gate_32 = 0x5,
@@ -48,15 +47,12 @@ var idt: [256]Entry = @splat(Entry.nil);
 
 extern const isr_table: [32]u32;
 extern const irq_table: [16]u32;
+pub const IRQ_BASE = 0x20;
 
 extern fn idt_flush(idtr: *const Descriptor) callconv(.c) void;
 
 pub fn init() void {
     const flags: Flags = .{ .gate_type = .interrupt_gate_32, .dpl = .kernel_mode };
-
-    const IRQ_BASE = 0x20;
-
-    pic.remap(IRQ_BASE, IRQ_BASE + 8);
 
     for (isr_table, 0..) |handler, i| {
         idt[i] = Entry.init(handler, privilege.KERNEL_CS, flags);

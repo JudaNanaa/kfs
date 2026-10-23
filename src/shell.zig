@@ -1,59 +1,53 @@
-const input = @import("input.zig");
-const tty = @import("tty.zig");
-const terminal = @import("terminal.zig");
-const stdx = @import("stdx.zig");
-
-fn prompt() void {
-    const current_ter = terminal.active();
-
-    current_ter.write("> ");
-}
+const tty = @import("console/tty.zig");
+const std = @import("std");
 
 const Command = struct {
     name: []const u8,
     help: []const u8,
-    run: *const fn () void,
+    run: *const fn (args: []const u8, sh: *Shell) void,
 };
 
 const commands = [_]Command{
     .{ .name = "clear", .help = "clear the screen", .run = cmdClear },
-    .{ .name = "help", .help = "list all commands", .run = cmdHelp },
+    .{ .name = "echo", .help = "display a line of text", .run = cmdEcho },
+    .{ .name = "help", .help = "show all commands", .run = cmdHelp },
 };
 
-fn cmdClear() void {
-    terminal.active().clear();
+fn cmdEcho(args: []const u8, sh: *Shell) void {
+    sh.tty.print("{s}\n", .{args});
 }
 
-fn cmdHelp() void {
-    const t = terminal.active();
+fn cmdClear(_: []const u8, sh: *Shell) void {
+    sh.tty.clear();
+}
+
+fn cmdHelp(_: []const u8, sh: *Shell) void {
     for (commands) |c|
-        t.print("{s}:\t{s}\n", .{ c.name, c.help });
+        sh.tty.print("{s}\t{s}\n", .{ c.name, c.help });
 }
 
-fn execute(line: []const u8) void {
-    const t = terminal.active();
-    const trimmed = stdx.trim(line);
-    if (trimmed.len == 0) return;
+pub const Shell = struct {
+    tty: *tty.TTY,
 
-    for (commands) |c| {
-        if (stdx.eql(c.name, trimmed)) {
-            c.run();
-            return;
-        }
+    pub fn init(_tty: *tty.TTY) Shell {
+        return .{ .tty = _tty };
     }
-    t.print("command not found: {s}\n", .{trimmed});
-}
 
-pub fn run() noreturn {
-    prompt();
-    while (true) {
-        if (input.pop()) |key| {
-            if (tty.handle(key)) |cmd| {
-                execute(cmd);
-                prompt();
+    pub fn execute(self: *Shell, line: []const u8) void {
+        const trimmed = std.mem.trim(u8, line, " ");
+        if (trimmed.len == 0) return;
+
+        // sépare le nom de la commande et ses arguments
+        var it = std.mem.tokenizeScalar(u8, trimmed, ' ');
+        const name = it.next().?;
+        const args = std.mem.trim(u8, trimmed[name.len..], " ");
+
+        for (commands) |c| {
+            if (std.mem.eql(u8, c.name, name)) {
+                c.run(args, self);
+                return;
             }
-        } else {
-            asm volatile ("hlt"); // attend la prochaine IRQ
         }
+        self.tty.print("command not found: {s}\n", .{name});
     }
-}
+};

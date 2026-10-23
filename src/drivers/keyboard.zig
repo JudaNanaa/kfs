@@ -1,8 +1,9 @@
 const io = @import("../arch/x86/io.zig");
-const vga = @import("vga.zig");
 
-const terminal = @import("../terminal.zig");
 const input = @import("../input.zig");
+
+pub const IRQ = 1;
+
 const KBD_DATA: u16 = 0x60;
 
 const SC_LSHIFT = 0x2A;
@@ -43,6 +44,15 @@ fn translate(scancode: u8) u8 {
     return if (upper) keymap_shift[scancode] else base;
 }
 
+const SC_F1 = 0x3B;
+const SC_F10 = 0x44;
+const SC_LALT = 0x38;
+const SC_ESC = 0x01;
+const SC_UP: u8 = 0x48;
+const SC_DOWN: u8 = 0x50;
+const SC_LEFT: u8 = 0x4B;
+const SC_RIGHT: u8 = 0x4D;
+
 pub fn handler() void {
     const data = io.inb(KBD_DATA);
 
@@ -52,6 +62,18 @@ pub fn handler() void {
     }
     if (extended) {
         extended = false;
+
+        const ext_break = data & 0x80 != 0;
+        const ext_code = data & 0x7F;
+        if (ext_break) return;
+
+        switch (ext_code) {
+            SC_UP => input.push(.up),
+            SC_DOWN => input.push(.down),
+            SC_LEFT => input.push(.left),
+            SC_RIGHT => input.push(.right),
+            else => {},
+        }
         return;
     }
 
@@ -64,6 +86,12 @@ pub fn handler() void {
         SC_CAPS => if (!is_break) {
             caps_lock = !caps_lock;
         },
+        SC_F1...SC_F10 => if (!is_break) {
+            input.push(.{ .fkey = scancode - SC_F1 });
+        },
+        SC_ESC => if (!is_break) {
+            input.push(.escape);
+        },
         else => if (!is_break) {
             const c = translate(scancode);
             if (c != 0) {
@@ -72,4 +100,54 @@ pub fn handler() void {
             }
         },
     }
+}
+
+const testing = @import("std").testing;
+
+fn resetModifiers() void {
+    lshift = false;
+    rshift = false;
+    caps_lock = false;
+}
+
+const SC_A = 0x1E;
+const SC_1 = 0x02;
+
+test "keyboard: plain keys" {
+    resetModifiers();
+    try testing.expectEqual(@as(u8, 'a'), translate(SC_A));
+    try testing.expectEqual(@as(u8, '1'), translate(SC_1));
+    try testing.expectEqual(@as(u8, ' '), translate(0x39));
+}
+
+test "keyboard: either shift gives the shifted character" {
+    resetModifiers();
+    lshift = true;
+    try testing.expectEqual(@as(u8, 'A'), translate(SC_A));
+    try testing.expectEqual(@as(u8, '!'), translate(SC_1));
+    lshift = false;
+    rshift = true;
+    try testing.expectEqual(@as(u8, 'A'), translate(SC_A));
+}
+
+test "keyboard: caps lock only affects letters" {
+    resetModifiers();
+    caps_lock = true;
+    try testing.expectEqual(@as(u8, 'A'), translate(SC_A));
+    try testing.expectEqual(@as(u8, '1'), translate(SC_1));
+}
+
+test "keyboard: shift cancels caps lock on letters" {
+    resetModifiers();
+    caps_lock = true;
+    lshift = true;
+    try testing.expectEqual(@as(u8, 'a'), translate(SC_A));
+    try testing.expectEqual(@as(u8, '!'), translate(SC_1));
+}
+
+test "keyboard: unknown scancodes translate to 0" {
+    resetModifiers();
+    try testing.expectEqual(@as(u8, 0), translate(keymap.len));
+    try testing.expectEqual(@as(u8, 0), translate(0x7F));
+    try testing.expectEqual(@as(u8, 0), translate(SC_LSHIFT));
 }

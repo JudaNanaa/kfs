@@ -5,7 +5,7 @@ test {
     _ = @import("arch/x86/gdt.zig");
     _ = @import("arch/x86/idt.zig");
     _ = @import("arch/x86/pic.zig");
-    _ = @import("interrupts.zig");
+    _ = @import("arch/x86/interrupts.zig");
     _ = @import("drivers/keyboard.zig");
     _ = @import("input.zig");
     _ = @import("tty.zig");

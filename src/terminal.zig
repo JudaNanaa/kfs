@@ -236,7 +236,7 @@ pub const Terminal = struct {
     }
 
     pub fn print(self: *Terminal, comptime fmt: []const u8, args: anytype) void {
-        var buf: [256]u8 = undefined;
+        var buf: [1024]u8 = undefined;
         const s = std.fmt.bufPrint(&buf, fmt, args) catch "<fmt overflow>";
         self.write(s);
     }

@@ -3,6 +3,9 @@ const vga = @import("vga.zig");
 
 const terminal = @import("../terminal.zig");
 const input = @import("../input.zig");
+
+pub const IRQ = 1;
+
 const KBD_DATA: u16 = 0x60;
 
 const SC_LSHIFT = 0x2A;

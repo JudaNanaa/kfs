@@ -100,3 +100,53 @@ pub fn handler() void {
         },
     }
 }
+
+const testing = @import("std").testing;
+
+fn resetModifiers() void {
+    lshift = false;
+    rshift = false;
+    caps_lock = false;
+}
+
+const SC_A = 0x1E;
+const SC_1 = 0x02;
+
+test "keyboard: plain keys" {
+    resetModifiers();
+    try testing.expectEqual(@as(u8, 'a'), translate(SC_A));
+    try testing.expectEqual(@as(u8, '1'), translate(SC_1));
+    try testing.expectEqual(@as(u8, ' '), translate(0x39));
+}
+
+test "keyboard: either shift gives the shifted character" {
+    resetModifiers();
+    lshift = true;
+    try testing.expectEqual(@as(u8, 'A'), translate(SC_A));
+    try testing.expectEqual(@as(u8, '!'), translate(SC_1));
+    lshift = false;
+    rshift = true;
+    try testing.expectEqual(@as(u8, 'A'), translate(SC_A));
+}
+
+test "keyboard: caps lock only affects letters" {
+    resetModifiers();
+    caps_lock = true;
+    try testing.expectEqual(@as(u8, 'A'), translate(SC_A));
+    try testing.expectEqual(@as(u8, '1'), translate(SC_1));
+}
+
+test "keyboard: shift cancels caps lock on letters" {
+    resetModifiers();
+    caps_lock = true;
+    lshift = true;
+    try testing.expectEqual(@as(u8, 'a'), translate(SC_A));
+    try testing.expectEqual(@as(u8, '!'), translate(SC_1));
+}
+
+test "keyboard: unknown scancodes translate to 0" {
+    resetModifiers();
+    try testing.expectEqual(@as(u8, 0), translate(keymap.len));
+    try testing.expectEqual(@as(u8, 0), translate(0x7F));
+    try testing.expectEqual(@as(u8, 0), translate(SC_LSHIFT));
+}

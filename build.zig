@@ -42,25 +42,15 @@ pub fn build(b: *std.Build) void {
     kernel.setLinkerScript(b.path("linker.ld"));
     b.installArtifact(kernel);
 
-    const gdt_tests = b.addTest(.{
+    const tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/arch/x86/gdt.zig"),
+            .root_source_file = b.path("src/tests.zig"),
             .target = b.graph.host,
             .optimize = optimize,
         }),
     });
-    const run_gdt_tests = b.addRunArtifact(gdt_tests);
-
-    const idt_tests = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/arch/x86/idt.zig"),
-            .target = b.graph.host,
-            .optimize = optimize,
-        }),
-    });
-    const run_idt_tests = b.addRunArtifact(idt_tests);
+    const run_tests = b.addRunArtifact(tests);
 
     const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_gdt_tests.step);
-    test_step.dependOn(&run_idt_tests.step);
+    test_step.dependOn(&run_tests.step);
 }

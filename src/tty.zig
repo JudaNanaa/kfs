@@ -211,3 +211,104 @@ pub const TTY = struct {
         self.term.clear();
     }
 };
+
+const testing = std.testing;
+
+fn lineFrom(s: []const u8) Line {
+    var l: Line = .{};
+    l.change(s);
+    return l;
+}
+
+test "Line: insert at the end, in the middle and at the start" {
+    var l: Line = .{};
+    try testing.expect(l.insert(0, 'b'));
+    try testing.expect(l.insert(1, 'd'));
+    try testing.expect(l.insert(1, 'c'));
+    try testing.expect(l.insert(0, 'a'));
+    try testing.expectEqualStrings("abcd", l.get());
+}
+
+test "Line: insert past the end is rejected" {
+    var l = lineFrom("ab");
+    try testing.expect(!l.insert(3, 'x'));
+    try testing.expectEqualStrings("ab", l.get());
+}
+
+test "Line: insert into a full line is rejected" {
+    var l: Line = .{};
+    for (0..l.cap) |_| try testing.expect(l.insert(l.len, 'x'));
+    try testing.expect(!l.insert(l.len, 'y'));
+    try testing.expect(!l.insert(10, 'y'));
+    try testing.expectEqual(l.cap, l.len);
+}
+
+test "Line: remove deletes the character left of the index" {
+    var l = lineFrom("abc");
+    try testing.expectEqual(@as(?u8, 'b'), l.remove(2));
+    try testing.expectEqualStrings("ac", l.get());
+    try testing.expectEqual(@as(?u8, 'c'), l.remove(2));
+    try testing.expectEqual(@as(?u8, 'a'), l.remove(1));
+    try testing.expectEqualStrings("", l.get());
+}
+
+test "Line: remove at index 0 or past the end does nothing" {
+    var l = lineFrom("ab");
+    try testing.expectEqual(@as(?u8, null), l.remove(0));
+    try testing.expectEqual(@as(?u8, null), l.remove(3));
+    try testing.expectEqualStrings("ab", l.get());
+}
+
+test "Line: remove works on a full line" {
+    var l: Line = .{};
+    for (0..l.cap) |_| _ = l.insert(l.len, 'x');
+    try testing.expectEqual(@as(?u8, 'x'), l.remove(l.len));
+    try testing.expectEqual(l.cap - 1, l.len);
+}
+
+test "Line: change truncates input longer than the capacity" {
+    var l: Line = .{};
+    l.change(&(@as([300]u8, @splat('z'))));
+    try testing.expectEqual(l.cap, l.len);
+}
+
+test "Line: isEmpty ignores spaces and tabs" {
+    var blank = lineFrom(" \t  ");
+    var text = lineFrom("  ls ");
+    try testing.expect(blank.isEmpty());
+    try testing.expect(!text.isEmpty());
+}
+
+test "History: empty history returns nothing" {
+    const h: History = .{};
+    try testing.expectEqual(@as(?[]const u8, null), h.get(0));
+    try testing.expectEqual(@as(?[]const u8, null), h.get(1));
+}
+
+test "History: get(1) is the most recent command" {
+    var h: History = .{};
+    h.push("first");
+    h.push("second");
+    try testing.expectEqualStrings("second", h.get(1).?);
+    try testing.expectEqualStrings("first", h.get(2).?);
+    try testing.expectEqual(@as(?[]const u8, null), h.get(3));
+}
+
+test "History: oldest entries are overwritten once full" {
+    var h: History = .{};
+    var buf: [8]u8 = undefined;
+    for (0..History.capacity + 1) |i| {
+        h.push(try std.fmt.bufPrint(&buf, "cmd{}", .{i}));
+    }
+    try testing.expectEqual(History.capacity, h.len);
+    try testing.expectEqualStrings("cmd32", h.get(1).?);
+    try testing.expectEqualStrings("cmd1", h.get(History.capacity).?);
+    try testing.expectEqual(@as(?[]const u8, null), h.get(History.capacity + 1));
+}
+
+test "History: a reused slot does not keep its old content" {
+    var h: History = .{};
+    h.push("a very long command");
+    for (0..History.capacity) |_| h.push("ls");
+    try testing.expectEqualStrings("ls", h.get(History.capacity).?);
+}

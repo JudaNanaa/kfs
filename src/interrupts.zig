@@ -83,3 +83,29 @@ fn exception(frame: *const Frame) noreturn {
     mux.printkAll("EIP 0x{x:0>8}\n", .{frame.eip});
     while (true) asm volatile ("cli; hlt");
 }
+
+const testing = @import("std").testing;
+
+// The layout must match exactly what interrupts.s pushes:
+// pushad (8 registers), then vector and error code, then eip/cs/eflags from the CPU.
+test "Frame: layout matches the assembly stub" {
+    try testing.expectEqual(@as(usize, 13 * 4), @sizeOf(Frame));
+    try testing.expectEqual(@as(usize, 0), @offsetOf(Frame, "edi"));
+    try testing.expectEqual(@as(usize, 7 * 4), @offsetOf(Frame, "eax"));
+    try testing.expectEqual(@as(usize, 8 * 4), @offsetOf(Frame, "vector"));
+    try testing.expectEqual(@as(usize, 9 * 4), @offsetOf(Frame, "error_code"));
+    try testing.expectEqual(@as(usize, 10 * 4), @offsetOf(Frame, "eip"));
+    try testing.expectEqual(@as(usize, 12 * 4), @offsetOf(Frame, "eflags"));
+}
+
+test "Frame: isIrq covers vectors 0x20 to 0x2F only" {
+    var f = @as(Frame, @bitCast(@as([13]u32, @splat(0))));
+    for ([_]u32{ 0x00, 0x0E, 0x1F, 0x30, 0x80 }) |v| {
+        f.vector = v;
+        try testing.expect(!f.isIrq());
+    }
+    for ([_]u32{ 0x20, 0x21, 0x2F }) |v| {
+        f.vector = v;
+        try testing.expect(f.isIrq());
+    }
+}

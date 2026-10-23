@@ -1,18 +1,17 @@
 const std = @import("std");
 const input = @import("../input.zig");
-const terminal = @import("terminal.zig");
 const tty = @import("tty.zig");
 const cpu = @import("../arch/x86/cpu.zig");
 const vga = @import("../drivers/vga.zig");
 
 const Mode = enum {
     normal,
-    select,
+    insert,
 
     fn change(self: *Mode) void {
         self.* = switch (self.*) {
-            .normal => .select,
-            .select => .normal,
+            .normal => .insert,
+            .insert => .normal,
         };
     }
 };
@@ -25,7 +24,7 @@ const status = @import("status.zig");
 fn modeLabel(m: Mode) []const u8 {
     return switch (m) {
         .normal => "-- INSERT --",
-        .select => "-- NORMAL --",
+        .insert => "-- NORMAL --",
     };
 }
 
@@ -52,7 +51,7 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
         fn handle(self: *Self, key: input.Key) void {
             switch (self.mode) {
                 .normal => self.normalHandler(key),
-                .select => self.selectHandler(key),
+                .insert => self.insertHandler(key),
             }
             self.render();
         }
@@ -67,7 +66,7 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
             }
         }
 
-        fn selectHandler(self: *Self, key: input.Key) void {
+        fn insertHandler(self: *Self, key: input.Key) void {
             switch (key) {
                 .escape => {
                     self.currentTTY().goToBottom();
@@ -117,7 +116,7 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
 
         fn drawStatus(self: *Self) void {
             if (self.show_status) {
-                status.draw(self.current_tty, self.ttys.len, modeLabel(self.mode), "esc:mode F1-F4:tty F10:bar");
+                status.draw(self.current_tty, self.ttys.len, modeLabel(self.mode), "esc:mode F1-F4:tty");
             } else {
                 status.clear();
             }
@@ -125,10 +124,12 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
 
         pub fn run(self: *Self) noreturn {
             while (true) {
+                cpu.disableInterrupts();
                 if (input.pop()) |key| {
+                    cpu.enableInterrupts();
                     self.handle(key);
                 } else {
-                    cpu.halt();
+                    cpu.enableInterruptsAndHalt();
                 }
             }
         }

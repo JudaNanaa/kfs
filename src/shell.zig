@@ -1,6 +1,4 @@
-const input = @import("input.zig");
 const tty = @import("console/tty.zig");
-const terminal = @import("console/terminal.zig");
 const std = @import("std");
 
 const Command = struct {

@@ -1,5 +1,4 @@
 const io = @import("../arch/x86/io.zig");
-const vga = @import("vga.zig");
 
 const input = @import("../input.zig");
 

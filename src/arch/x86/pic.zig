@@ -98,14 +98,13 @@ pub fn remap(offset1: u8, offset2: u8) void {
     io.outb(slave.data, @bitCast(icw4));
     io.wait();
 
-    // Unmask both PICs
-    io.outb(master.data, 0);
-    io.outb(slave.data, 0);
+    // Mask both PICs
+    disable();
 }
 
 pub fn disable() void {
-    io.outb(master.data, 0xff);
-    io.outb(slave.data, 0xff);
+    io.outb(master.data, 0xFF);
+    io.outb(slave.data, 0xFF);
 }
 
 fn changeMask(irq: u4, masked: bool) void {

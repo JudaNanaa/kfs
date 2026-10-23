@@ -72,7 +72,6 @@ export fn interrupt_handler(frame: *const Frame) callconv(.c) void {
 }
 
 pub fn initIRQ() void {
-    pic.disable();
     registerIrq(1, keyboard.handler);
     pic.clearMask(1);
 }

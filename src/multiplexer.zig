@@ -2,6 +2,7 @@ const std = @import("std");
 const input = @import("input.zig");
 const terminal = @import("terminal.zig");
 const tty = @import("tty.zig");
+const cpu = @import("arch/x86/cpu.zig");
 
 const Mode = enum {
     normal,
@@ -136,7 +137,7 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
                 if (input.pop()) |key| {
                     self.handle(key);
                 } else {
-                    asm volatile ("hlt");
+                    cpu.halt();
                 }
             }
         }

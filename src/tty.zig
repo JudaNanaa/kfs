@@ -3,50 +3,33 @@ const terminal = @import("terminal.zig");
 const shell = @import("shell.zig");
 const std = @import("std");
 
-const serial = @import("drivers/serial.zig");
-
 pub const Line = struct {
     str: [256]u8 = undefined,
     len: usize = 0,
     cap: usize = 256,
 
-    pub fn insert(self: *Line, idx: usize, c: u8) void {
-        serial.print("je suis dans insert\n", .{});
-        serial.print("idx == {}", .{idx});
-        serial.print("self.cap == {}", .{self.cap});
-        serial.print("self.len == {}", .{self.len});
-        if (idx >= self.cap or idx > self.len) return;
+    pub fn insert(self: *Line, idx: usize, c: u8) bool {
+        if (self.len >= self.cap or idx > self.len) return false;
 
-        if (idx == self.len) {
-            self.append(c);
-        } else {
-            @memmove(self.str[idx + 1 .. self.cap], self.str[idx .. self.cap - 1]);
-            self.str[idx] = c;
-            self.len += 1;
-        }
-
-        serial.print("str == {s}\n", .{self.str[0..self.len]});
+        @memmove(self.str[idx + 1 .. self.len + 1], self.str[idx..self.len]);
+        self.str[idx] = c;
+        self.len += 1;
+        return true;
     }
 
     pub fn remove(self: *Line, idx: usize) ?u8 {
-        if (idx == 0) return null;
-        if (idx >= self.cap or idx > self.len) return null;
+        if (idx == 0 or idx > self.len) return null;
 
-        if (idx == self.len) {
-            return self.pop();
-        }
-
-        const c = self.str[idx];
-        @memmove(self.str[idx - 1 .. self.cap - 1], self.str[idx..self.cap]);
-
+        const c = self.str[idx - 1];
+        @memmove(self.str[idx - 1 .. self.len - 1], self.str[idx..self.len]);
         self.len -= 1;
-
         return c;
     }
 
     pub fn change(self: *Line, str: []const u8) void {
-        @memcpy(self.str[0..], str);
-        self.len = str.len;
+        const n = @min(str.len, self.cap);
+        @memcpy(self.str[0..n], str[0..n]);
+        self.len = n;
     }
 
     pub fn append(self: *Line, c: u8) void {
@@ -54,18 +37,12 @@ pub const Line = struct {
         self.len += 1;
     }
 
-    pub fn pop(self: *Line) ?u8 {
+    fn pop(self: *Line) ?u8 {
         if (self.len == 0)
             return null;
         self.len -= 1;
         const idx = self.len;
         return self.str[idx];
-    }
-
-    pub fn take(self: *Line) []const u8 {
-        const len = self.len;
-        self.len = 0;
-        return self.str[0..len];
     }
 
     pub fn get(self: *Line) []const u8 {
@@ -85,19 +62,16 @@ const History = struct {
     head: usize = 0,
     len: usize = 0,
 
-    fn addHistory(self: *History) void {
+    fn push(self: *History, s: []const u8) void {
+        self.lines[self.head].change(s);
         self.head = (self.head + 1) % capacity;
-        self.len += 1;
+        if (self.len < capacity) self.len += 1;
     }
 
-    fn get(self: *const History, back: usize) ?*const Line {
-        serial.print("back == {}", .{back});
+    fn get(self: *const History, back: usize) ?[]const u8 {
         if (back == 0 or back > self.len) return null;
-        return &self.lines[(self.head - back) % self.len];
-    }
-
-    fn currentLine(self: *History) *Line {
-        return &self.lines[self.head];
+        const l = &self.lines[(self.head + capacity - back) % capacity];
+        return l.str[0..l.len];
     }
 };
 
@@ -106,7 +80,8 @@ pub const TTY = struct {
 
     term: terminal.Terminal,
     history: History = .{},
-    line: *Line = undefined,
+    line: Line = .{},
+    draft: Line = .{},
     line_index: usize = 0,
     browsing: usize = 0,
     shell: shell.Shell,
@@ -114,7 +89,8 @@ pub const TTY = struct {
     pub fn init(self: *TTY) void {
         self.term = .init();
         self.history = .{};
-        self.line = self.history.currentLine();
+        self.line = .{};
+        self.draft = .{};
         self.browsing = 0;
         self.line_index = 0;
         self.shell = .init(self);
@@ -125,7 +101,7 @@ pub const TTY = struct {
         switch (key) {
             .char => |c| {
                 self.browsing = 0;
-                self.line.insert(self.line_index, c);
+                if (!self.line.insert(self.line_index, c)) return;
                 self.line_index += 1;
                 self.term.putChar(c);
             },
@@ -139,14 +115,12 @@ pub const TTY = struct {
             .enter => {
                 self.term.newline();
                 if (!self.line.isEmpty()) {
-                    serial.print("je vais faire addHistory\n", .{});
-                    const cmd = self.line.get();
-                    self.shell.execute(cmd);
-                    self.history.addHistory();
-                    self.line = self.history.currentLine();
+                    self.history.push(self.line.get());
+                    self.shell.execute(self.line.get());
                 }
-                self.browsing = 0;
+                self.line.len = 0;
                 self.line_index = 0;
+                self.browsing = 0;
                 self.prompt();
             },
             .left => {
@@ -164,15 +138,29 @@ pub const TTY = struct {
                 self.updateCursor();
             },
             .up => {
-                serial.print("je suis dans le up0\n", .{});
-                if (self.history.get(self.browsing + 1)) |line| {
-                    serial.print("je suis dans le up1\n", .{});
-                    self.browsing += 1;
-                    self.line.change(&line.str);
-                }
+                const entry = self.history.get(self.browsing + 1) orelse return;
+                if (self.browsing == 0) self.draft.change(self.line.get());
+                self.browsing += 1;
+                self.replaceLine(entry);
+            },
+            .down => {
+                if (self.browsing == 0) return;
+                self.browsing -= 1;
+                const entry = if (self.browsing == 0) self.draft.get() else self.history.get(self.browsing).?;
+                self.replaceLine(entry);
             },
             else => {},
         }
+    }
+
+    fn replaceLine(self: *TTY, new: []const u8) void {
+        while (self.line_index < self.line.len) : (self.line_index += 1)
+            self.term.cursor.moveRight() catch unreachable;
+        while (self.line_index > 0) : (self.line_index -= 1)
+            self.term.backspace();
+        self.line.change(new);
+        self.term.write(new);
+        self.line_index = self.line.len;
     }
 
     pub fn scroll(self: *TTY, direction: terminal.Terminal.ScrollDirection) void {

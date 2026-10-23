@@ -47,15 +47,35 @@ pub fn blit(cells: *const [width * (height - 1)]Entry) void {
     for (cells, 0..) |e, i| mmio[i] = e;
 }
 
+const CRTC_INDEX: u16 = 0x3D4;
+const CRTC_DATA: u16 = 0x3D5;
+
+const REG_CURSOR_START = 0x0A;
+const REG_CURSOR_END = 0x0B;
+const REG_CURSOR_HIGH = 0x0E;
+const REG_CURSOR_LOW = 0x0F;
+
+fn writeReg(reg: u8, value: u8) void {
+    io.outb(CRTC_INDEX, reg);
+    io.outb(CRTC_DATA, value);
+}
+
+fn readReg(reg: u8) u8 {
+    io.outb(CRTC_INDEX, reg);
+    return io.inb(CRTC_DATA);
+}
+
 pub fn setCursor(x: usize, y: usize) void {
     const pos: u16 = @intCast(y * width + x);
-    io.setCursor(pos);
+    writeReg(REG_CURSOR_LOW, @truncate(pos));
+    writeReg(REG_CURSOR_HIGH, @truncate(pos >> 8));
 }
 
 pub fn unsetCursor() void {
-    io.unsetCursor();
+    writeReg(REG_CURSOR_START, 0x20);
 }
 
 pub fn enableCursor() void {
-    io.enableCursor(14, 15);
+    writeReg(REG_CURSOR_START, (readReg(REG_CURSOR_START) & 0xC0) | 14);
+    writeReg(REG_CURSOR_END, (readReg(REG_CURSOR_END) & 0xE0) | 15);
 }

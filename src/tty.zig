@@ -128,14 +128,12 @@ pub const TTY = struct {
 
                 self.line_index -= 1;
                 self.term.cursor.moveLeft() catch unreachable;
-                self.updateCursor();
             },
             .right => {
                 if (self.line_index >= self.line.len) return;
 
                 self.line_index += 1;
                 self.term.cursor.moveRight() catch unreachable;
-                self.updateCursor();
             },
             .up => {
                 const entry = self.history.get(self.browsing + 1) orelse return;
@@ -171,28 +169,8 @@ pub const TTY = struct {
         self.term.goToBottom();
     }
 
-    pub fn updateCursor(self: *TTY) void {
-        self.term.updateCursor();
-    }
-
-    pub fn showCursor(self: *TTY) void {
-        self.term.showCursor();
-    }
-
-    pub fn hideCursor(self: *TTY) void {
-        self.term.hideCursor();
-    }
-
     pub fn prompt(self: *TTY) void {
         return self.write(PROMPT);
-    }
-
-    pub fn forceFlush(self: *TTY) void {
-        self.term.forceFlush();
-    }
-
-    pub fn flush(self: *TTY) void {
-        self.term.flush();
     }
 
     pub fn write(self: *TTY, s: []const u8) void {

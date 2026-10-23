@@ -50,6 +50,7 @@ pub fn exception(f: *const interrupts.Frame) noreturn {
 
 pub fn zigPanic(msg: []const u8, _: ?usize) noreturn {
     cpu.disableInterrupts();
+    vga.unsetCursor();
     clearScreen();
     line("KERNEL PANIC: {s}", .{msg});
     halt();

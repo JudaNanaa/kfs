@@ -1,7 +1,5 @@
 const std = @import("std");
 const vga = @import("drivers/vga.zig");
-const shell = @import("shell.zig");
-const input = @import("input.zig");
 
 const Cursor = struct {
     idx: usize,
@@ -69,19 +67,6 @@ const Cursor = struct {
     fn carriageReturn(self: *Cursor) void {
         self.idx = self.row() * self.len_row;
     }
-
-    fn sync(self: *Cursor) void {
-        vga.setCursor(self.col(), self.row());
-    }
-
-    fn hide(_: *Cursor) void {
-        vga.unsetCursor();
-    }
-
-    fn show(self: *Cursor) void {
-        vga.enableCursor();
-        self.sync();
-    }
 };
 
 pub const Terminal = struct {
@@ -96,7 +81,6 @@ pub const Terminal = struct {
     cursor: Cursor,
     fg: vga.Color = .white,
     bg: vga.Color = .black,
-    dirty_rows: u32 = 0xFFFFFFFF,
 
     pub fn init() Terminal {
         var self: Terminal = .{
@@ -108,6 +92,17 @@ pub const Terminal = struct {
         return self;
     }
 
+    pub const Pos = struct { x: usize, y: usize };
+
+    /// The rows currently on screen, for whoever draws them.
+    pub fn visibleCells(self: *const Terminal) *const [visible]vga.Entry {
+        return self.cells[self.top * vga.width ..][0..visible];
+    }
+
+    pub fn cursorPos(self: *const Terminal) Pos {
+        return .{ .x = self.cursor.col(), .y = self.cursor.row() };
+    }
+
     fn view(self: *Terminal) *[visible]vga.Entry {
         return self.cells[self.top * vga.width ..][0..visible];
     }
@@ -117,20 +112,6 @@ pub const Terminal = struct {
         self.top = 0;
         self.bottom = 0;
         self.cursor.reset();
-        self.markAllDirty();
-        self.flush();
-    }
-
-    pub fn updateCursor(self: *Terminal) void {
-        self.cursor.sync();
-    }
-
-    pub fn showCursor(self: *Terminal) void {
-        self.cursor.show();
-    }
-
-    pub fn hideCursor(self: *Terminal) void {
-        self.cursor.hide();
     }
 
     fn scrollContent(self: *Terminal) void {
@@ -149,8 +130,6 @@ pub const Terminal = struct {
             self.cursor.carriageReturn();
         };
         self.bottom = @max(self.bottom, self.top + self.cursor.row());
-        self.markAllDirty();
-        self.flush();
     }
 
     pub fn backspace(self: *Terminal) void {
@@ -160,8 +139,6 @@ pub const Terminal = struct {
         @memmove(self.cells[idx .. vga.width * history - 1], self.cells[idx + 1 ..]);
 
         self.cells[vga.width * history - 1] = vga.Entry.init(' ', self.fg, self.bg);
-
-        self.markAllDirty();
     }
 
     pub fn goToBottom(self: *Terminal) void {
@@ -170,8 +147,6 @@ pub const Terminal = struct {
         } else {
             self.top = self.bottom - text_height + 1;
         }
-
-        self.markAllDirty();
     }
 
     pub fn putCharColor(self: *Terminal, c: u8, fg: vga.Color, bg: vga.Color) void {
@@ -191,7 +166,6 @@ pub const Terminal = struct {
                 self.cells[i] = vga.Entry.init(c, fg, bg);
 
                 self.cursor.moveRight() catch self.newline();
-                self.markAllDirty();
             },
         }
     }
@@ -212,15 +186,6 @@ pub const Terminal = struct {
                 self.top += 1;
             },
         }
-        self.markAllDirty();
-    }
-
-    fn markDirty(self: *Terminal, row: usize) void {
-        self.dirty_rows |= @as(u32, 1) << @intCast(row);
-    }
-
-    fn markAllDirty(self: *Terminal) void {
-        self.dirty_rows = std.math.maxInt(u32);
     }
 
     pub fn putChar(self: *Terminal, c: u8) void {
@@ -246,22 +211,46 @@ pub const Terminal = struct {
         const s = std.fmt.bufPrint(&buf, fmt, args) catch "<fmt overflow>";
         self.writeColor(s, .white, .red);
     }
-
-    pub fn forceFlush(self: *Terminal) void {
-        vga.blit(self.view());
-        self.dirty_rows = 0;
-    }
-
-    pub fn flush(self: *Terminal) void {
-        const _view = self.view();
-        for (0..text_height) |row| {
-            const mask = @as(u32, 1) << @intCast(row);
-            if (self.dirty_rows & mask != 0) {
-                // tranche de 80 entrées à partir de l'offset de la ligne
-                vga.blitRow(row, _view[row * vga.width ..][0..vga.width]);
-            }
-        }
-        self.dirty_rows = 0;
-        // self.cursor.sync();
-    }
 };
+
+const testing = std.testing;
+
+test "Terminal: characters are written at the cursor" {
+    var t = Terminal.init();
+    t.write("hi");
+    try testing.expectEqual(@as(u8, 'h'), t.cells[0].char);
+    try testing.expectEqual(@as(u8, 'i'), t.cells[1].char);
+    try testing.expectEqual(Terminal.Pos{ .x = 2, .y = 0 }, t.cursorPos());
+}
+
+test "Terminal: newline moves to the start of the next row" {
+    var t = Terminal.init();
+    t.write("abc\n");
+    try testing.expectEqual(Terminal.Pos{ .x = 0, .y = 1 }, t.cursorPos());
+}
+
+test "Terminal: backspace removes the previous character" {
+    var t = Terminal.init();
+    t.write("ab");
+    t.backspace();
+    try testing.expectEqual(@as(u8, ' '), t.cells[1].char);
+    try testing.expectEqual(Terminal.Pos{ .x = 1, .y = 0 }, t.cursorPos());
+}
+
+test "Terminal: the view scrolls when the screen is full" {
+    var t = Terminal.init();
+    for (0..Terminal.text_height) |_| t.newline();
+    try testing.expectEqual(@as(usize, 1), t.top);
+    try testing.expectEqual(Terminal.text_height - 1, t.cursorPos().y);
+}
+
+test "Terminal: scroll up then goToBottom returns to the latest line" {
+    var t = Terminal.init();
+    for (0..Terminal.text_height + 5) |_| t.newline();
+    const bottom_top = t.top;
+    t.scroll(.up);
+    t.scroll(.up);
+    try testing.expectEqual(bottom_top - 2, t.top);
+    t.goToBottom();
+    try testing.expectEqual(bottom_top, t.top);
+}

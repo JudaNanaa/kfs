@@ -9,4 +9,5 @@ test {
     _ = @import("drivers/keyboard.zig");
     _ = @import("input.zig");
     _ = @import("tty.zig");
+    _ = @import("terminal.zig");
 }

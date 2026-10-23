@@ -3,6 +3,7 @@ const input = @import("input.zig");
 const terminal = @import("terminal.zig");
 const tty = @import("tty.zig");
 const cpu = @import("arch/x86/cpu.zig");
+const vga = @import("drivers/vga.zig");
 
 const Mode = enum {
     normal,
@@ -42,12 +43,10 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
             self.current_tty = 0;
             self.show_status = true;
 
-            for (&self.ttys) |*_tty| {
-                _tty.init();
-            }
-            self.currentTTY().flush();
-            self.currentTTY().showCursor();
-            self.drawStatus();
+            for (&self.ttys) |*t| t.init();
+
+            vga.enableCursor();
+            self.render();
         }
 
         fn handle(self: *Self, key: input.Key) void {
@@ -55,20 +54,16 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
                 .normal => self.normalHandler(key),
                 .select => self.selectHandler(key),
             }
+            self.render();
         }
 
         fn normalHandler(self: *Self, key: input.Key) void {
             switch (key) {
                 .escape => {
-                    self.currentTTY().hideCursor();
+                    vga.unsetCursor();
                     self.mode.change();
-                    self.drawStatus();
                 },
-                else => {
-                    self.currentTTY().receveKey(key);
-                    self.currentTTY().flush();
-                    self.currentTTY().updateCursor();
-                },
+                else => self.currentTTY().receveKey(key),
             }
         }
 
@@ -76,48 +71,44 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
             switch (key) {
                 .escape => {
                     self.currentTTY().goToBottom();
-                    self.currentTTY().flush();
-                    self.currentTTY().showCursor();
+                    vga.enableCursor();
                     self.mode.change();
-                    self.drawStatus();
                 },
                 .fkey => |n| self.switchTTY(n),
                 .right => self.switchTTYToRight(),
                 .left => self.switchTTYToLeft(),
-                .down => {
-                    self.currentTTY().scroll(.down);
-                    self.currentTTY().flush();
-                },
-                .up => {
-                    self.currentTTY().scroll(.up);
-                    self.currentTTY().flush();
-                },
+                .down => self.currentTTY().scroll(.down),
+                .up => self.currentTTY().scroll(.up),
                 .char, .backspace, .enter => {},
             }
+        }
+
+        fn render(self: *Self) void {
+            const term = &self.currentTTY().term;
+            vga.blit(term.visibleCells());
+            if (self.mode == .normal) {
+                const pos = term.cursorPos();
+                vga.setCursor(pos.x, pos.y);
+            }
+            self.drawStatus();
         }
 
         fn switchTTYToRight(self: *Self) void {
             if (self.current_tty + 1 >= self.ttys.len) return;
 
             self.current_tty += 1;
-            self.currentTTY().forceFlush();
-            self.drawStatus();
         }
 
         fn switchTTYToLeft(self: *Self) void {
             if (self.current_tty == 0) return;
 
             self.current_tty -= 1;
-            self.currentTTY().forceFlush();
-            self.drawStatus();
         }
 
         fn switchTTY(self: *Self, index: u8) void {
             if (index >= self.ttys.len or index == self.current_tty) return;
 
             self.current_tty = index;
-            self.currentTTY().forceFlush();
-            self.drawStatus();
         }
 
         fn currentTTY(self: *Self) *tty.TTY {
@@ -139,18 +130,6 @@ pub fn Multiplexer(comptime nb_terms: usize) type {
                 } else {
                     cpu.halt();
                 }
-            }
-        }
-
-        pub fn printAll(self: *Self, comptime fmt: []const u8, args: anytype) void {
-            for (&self.ttys) |*_tty| {
-                _tty.print(fmt, args);
-            }
-        }
-
-        pub fn printkAll(self: *Self, comptime fmt: []const u8, args: anytype) void {
-            for (&self.ttys) |*_tty| {
-                _tty.printk(fmt, args);
             }
         }
     };

@@ -8,6 +8,8 @@ test {
     _ = @import("arch/x86/interrupts.zig");
     _ = @import("drivers/keyboard.zig");
     _ = @import("input.zig");
-    _ = @import("tty.zig");
-    _ = @import("terminal.zig");
+    _ = @import("console/tty.zig");
+    _ = @import("console/terminal.zig");
+    _ = @import("console/line.zig");
+    _ = @import("console/history.zig");
 }

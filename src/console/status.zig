@@ -1,4 +1,4 @@
-const vga = @import("drivers/vga.zig");
+const vga = @import("../drivers/vga.zig");
 
 const row = vga.height - 1;
 

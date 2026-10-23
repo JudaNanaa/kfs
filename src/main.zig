@@ -1,5 +1,5 @@
 const std = @import("std");
-const multiplexer = @import("multiplexer.zig");
+const multiplexer = @import("console/multiplexer.zig");
 const gdt = @import("arch/x86/gdt.zig");
 const idt = @import("arch/x86/idt.zig");
 const pic = @import("arch/x86/pic.zig");

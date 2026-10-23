@@ -1,7 +1,7 @@
 const io = @import("../arch/x86/io.zig");
 const vga = @import("vga.zig");
 
-const terminal = @import("../terminal.zig");
+const terminal = @import("../console/terminal.zig");
 const input = @import("../input.zig");
 
 pub const IRQ = 1;

@@ -1,5 +1,5 @@
 const std = @import("std");
-const vga = @import("drivers/vga.zig");
+const vga = @import("../drivers/vga.zig");
 
 const Cursor = struct {
     idx: usize,

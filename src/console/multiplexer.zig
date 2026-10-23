@@ -1,9 +1,9 @@
 const std = @import("std");
-const input = @import("input.zig");
+const input = @import("../input.zig");
 const terminal = @import("terminal.zig");
 const tty = @import("tty.zig");
-const cpu = @import("arch/x86/cpu.zig");
-const vga = @import("drivers/vga.zig");
+const cpu = @import("../arch/x86/cpu.zig");
+const vga = @import("../drivers/vga.zig");
 
 const Mode = enum {
     normal,

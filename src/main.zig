@@ -9,10 +9,12 @@ const interrupts = @import("arch/x86/interrupts.zig");
 const serial = @import("drivers/serial.zig");
 const keyboard = @import("drivers/keyboard.zig");
 pub const panic = std.debug.FullPanic(panic_screen.zigPanic);
+const vga = @import("drivers/vga.zig");
 
 export fn kernel_main() callconv(.c) void {
     interrupts.setExceptionHandler(panic_screen.exception);
     serial.init();
+    vga.init();
     gdt.init();
     serial.print("la gdt est init\n", .{});
     idt.init();

@@ -32,15 +32,16 @@ pub const TTY = struct {
             .char => |c| {
                 self.browsing = 0;
                 if (!self.line.insert(self.line_index, c)) return;
-                self.line_index += 1;
                 self.term.putChar(c);
+                self.line_index += 1;
+                self.redrawTail(false);
             },
             .backspace => {
                 self.browsing = 0;
-                if (self.line.remove(self.line_index) != null) {
-                    self.line_index -= 1;
-                    self.term.backspace();
-                }
+                if (self.line.remove(self.line_index) == null) return;
+                self.line_index -= 1;
+                self.term.cursor.moveLeft() catch unreachable;
+                self.redrawTail(true);
             },
             .enter => {
                 self.term.newline();
@@ -81,6 +82,15 @@ pub const TTY = struct {
         }
     }
 
+    fn redrawTail(self: *TTY, erase_last: bool) void {
+        const tail = self.line.get()[self.line_index..];
+        self.term.write(tail);
+        if (erase_last) self.term.putChar(' ');
+
+        const n = tail.len + @intFromBool(erase_last);
+        for (0..n) |_| self.term.cursor.moveLeft() catch unreachable;
+    }
+
     fn replaceLine(self: *TTY, new: []const u8) void {
         while (self.line_index < self.line.len) : (self.line_index += 1)
             self.term.cursor.moveRight() catch unreachable;
@@ -119,3 +129,29 @@ pub const TTY = struct {
         self.term.clear();
     }
 };
+
+const testing = std.testing;
+
+fn screenLine(t: *const TTY, len: usize) [64]u8 {
+    var buf: [64]u8 = @splat(0);
+    for (t.term.visibleCells()[0..len], 0..) |e, i| buf[i] = e.char;
+    return buf;
+}
+
+test "TTY: insert and backspace in the middle of the line shift the tail" {
+    var t: TTY = undefined;
+    t.init();
+    for ("abcd") |c| t.receveKey(.{ .char = c });
+    t.receveKey(.left);
+    t.receveKey(.left);
+
+    t.receveKey(.{ .char = 'X' });
+    try testing.expectEqualStrings("> abXcd ", screenLine(&t, 8)[0..8]);
+    try testing.expectEqual(terminal.Terminal.Pos{ .x = 5, .y = 0 }, t.term.cursorPos());
+
+    t.receveKey(.backspace);
+    t.receveKey(.backspace);
+    try testing.expectEqualStrings("> acd  ", screenLine(&t, 7)[0..7]);
+    try testing.expectEqual(terminal.Terminal.Pos{ .x = 3, .y = 0 }, t.term.cursorPos());
+    try testing.expectEqualStrings("acd", t.line.get());
+}

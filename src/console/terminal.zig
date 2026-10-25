@@ -136,9 +136,7 @@ pub const Terminal = struct {
         self.cursor.moveLeft() catch return;
 
         const idx = self.top * vga.width + self.cursor.row() * vga.width + self.cursor.col();
-        @memmove(self.cells[idx .. vga.width * history - 1], self.cells[idx + 1 ..]);
-
-        self.cells[vga.width * history - 1] = vga.Entry.init(' ', self.fg, self.bg);
+        self.cells[idx] = vga.Entry.init(' ', self.fg, self.bg);
     }
 
     pub fn goToBottom(self: *Terminal) void {
@@ -161,8 +159,6 @@ pub const Terminal = struct {
             },
             else => {
                 const i = self.top * vga.width + self.cursor.row() * vga.width + self.cursor.col();
-
-                @memmove(self.cells[i + 1 .. vga.width * history], self.cells[i .. vga.width * history - 1]);
                 self.cells[i] = vga.Entry.init(c, fg, bg);
 
                 self.cursor.moveRight() catch self.newline();

@@ -33,18 +33,33 @@ pub const Entry = packed struct(u16) {
 };
 
 const mmio: [*]volatile Entry = @ptrFromInt(0xB8000);
+var shadow: [width * height]Entry = undefined;
+
+fn put(idx: usize, entry: Entry) void {
+    if (@as(u16, @bitCast(shadow[idx])) == @as(u16, @bitCast(entry))) return;
+    shadow[idx] = entry;
+    mmio[idx] = entry;
+}
+
+pub fn init() void {
+    const blank = Entry.init(' ', .white, .black);
+    for (0..width * height) |i| {
+        shadow[i] = blank;
+        mmio[i] = blank;
+    }
+}
 
 pub fn write(x: usize, y: usize, entry: Entry) void {
-    mmio[y * width + x] = entry;
+    put(y * width + x, entry);
 }
 
 pub fn blitRow(row: usize, cells: *const [width]Entry) void {
     const base = row * width;
-    for (cells, 0..) |e, i| mmio[base + i] = e;
+    for (cells, 0..) |e, i| put(base + i, e);
 }
 
 pub fn blit(cells: *const [width * (height - 1)]Entry) void {
-    for (cells, 0..) |e, i| mmio[i] = e;
+    for (cells, 0..) |e, i| put(i, e);
 }
 
 const CRTC_INDEX: u16 = 0x3D4;
